@@ -1,0 +1,1445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loop — GTM Operator Console</title>
+<style>
+/* ============ DESIGN TOKENS — Loop editorial operations console ============
+   Ground: warm paper. Ink: deep warm near-black. Accent: oxidized teal (one).
+   Amber = awaiting human. Green = outcome. Coral = risk/blocked only.
+   Serif carries the agent's voice; sans carries UI; mono carries machine meta. */
+:root{
+  --bg:oklch(96.5% .008 85);
+  --surface:oklch(99% .004 85);
+  --surface-2:oklch(97.6% .006 85);
+  --ink:oklch(25% .02 60);
+  --muted:oklch(46% .02 60);
+  --faint:oklch(64% .015 70);
+  --line:oklch(88.5% .01 80);
+  --line-soft:oklch(92.5% .008 80);
+  --teal:oklch(46% .075 178);
+  --teal-strong:oklch(37% .068 178);
+  --teal-ink:oklch(30% .05 178);
+  --teal-soft:oklch(93.5% .028 178);
+  --amber:oklch(62% .12 75);
+  --amber-soft:oklch(95.5% .035 80);
+  --amber-ink:oklch(42% .09 75);
+  --green:oklch(50% .12 152);
+  --green-soft:oklch(95.5% .035 152);
+  --green-ink:oklch(38% .1 152);
+  --coral:oklch(52% .17 25);
+  --coral-soft:oklch(95.5% .028 25);
+  --coral-ink:oklch(42% .15 25);
+  --serif:'Iowan Old Style','Charter','Bitstream Charter',Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono','JetBrains Mono','IBM Plex Mono',Menlo,monospace;
+  --r-s:6px; --r-m:10px; --r-l:14px;
+  --sh-1:0 1px 2px oklch(25% .02 60 / .05);
+  --sh-2:0 10px 32px oklch(25% .02 60 / .14);
+  --t-fast:.14s ease;
+  --t-med:.26s cubic-bezier(.2,.7,.2,1);
+  --pad:12px;
+  --row-h:52px;
+}
+body.accent-blue{
+  --teal:oklch(48% .18 258); --teal-strong:oklch(40% .17 258); --teal-ink:oklch(32% .13 258);
+  --teal-soft:oklch(94% .03 258);
+}
+body.compact{ --pad:8px; --row-h:42px; }
+
+/* ============ base ============ */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font:14px/1.5 var(--sans);background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+a{color:var(--teal-strong);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--teal-soft)}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:4px}
+.serif{font-family:var(--serif);font-weight:400;letter-spacing:-.01em}
+.mono{font-family:var(--mono);font-size:11.5px;letter-spacing:0}
+.muted{color:var(--muted)} .faint{color:var(--faint)}
+.small{font-size:12.5px}
+svg.ic{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ============ APP SHELL ============ */
+#app{display:grid;grid-template-columns:236px 1fr;height:100vh}
+body.is-mobile #app{grid-template-columns:1fr}
+.sidebar{border-right:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;min-width:0}
+body.is-mobile .sidebar{display:none}
+.brand{display:flex;align-items:center;gap:10px;padding:16px 16px 14px;border-bottom:1px solid var(--line-soft)}
+.brand-mark{width:26px;height:26px;border-radius:8px;background:var(--teal);color:oklch(98% .005 85);
+  display:grid;place-items:center;font-family:var(--serif);font-size:15px;font-style:italic}
+.brand-name{font-family:var(--serif);font-size:17px}
+.ws-switch{display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 16px;border-bottom:1px solid var(--line-soft);
+  color:var(--muted);font-size:12.5px}
+.ws-switch:hover{background:var(--surface-2);color:var(--ink)}
+.ws-switch .mono{font-size:11px;color:var(--faint)}
+.nav{flex:1;overflow-y:auto;padding:10px 8px}
+.nav-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);padding:12px 10px 6px}
+.nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:var(--r-s);
+  color:var(--muted);font-size:13.5px;text-align:left;transition:background var(--t-fast),color var(--t-fast)}
+.nav-item:hover{background:var(--surface-2);color:var(--ink)}
+.nav-item[aria-current="page"]{background:var(--teal-soft);color:var(--teal-ink);font-weight:560}
+.nav-item .count{margin-left:auto;font-family:var(--mono);font-size:10.5px;background:var(--amber-soft);color:var(--amber-ink);
+  padding:1px 7px;border-radius:99px}
+.nav-item .count.zero{background:var(--surface-2);color:var(--faint)}
+.nav-item .count.learn{background:var(--green-soft);color:var(--green-ink)}
+.status-card{border-top:1px solid var(--line);padding:12px 14px 14px;background:var(--surface)}
+.status-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.mode-chip{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 7px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);color:var(--muted)}
+.mode-chip.auto{background:var(--teal-soft);border-color:transparent;color:var(--teal-ink)}
+.kv{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted);padding:3px 0}
+.kv b{font-family:var(--mono);font-size:11px;color:var(--ink);font-weight:500}
+.meter{height:4px;border-radius:99px;background:var(--line-soft);overflow:hidden;margin:4px 0 2px}
+.meter>i{display:block;height:100%;border-radius:99px;background:var(--teal);transition:width var(--t-med)}
+.meter.warn>i{background:var(--amber)} .meter.bad>i{background:var(--coral)}
+.guard-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--green-ink);
+  background:var(--green-soft);border-radius:5px;padding:3px 8px;margin-top:6px}
+
+/* ============ main column ============ */
+.main{display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.topbar{display:flex;align-items:center;gap:14px;padding:0 22px;height:58px;
+  border-bottom:1px solid var(--line);background:oklch(96.5% .008 85 / .92);backdrop-filter:blur(8px);z-index:20}
+body.is-mobile .topbar{padding:0 14px;gap:8px}
+.crumb{font-size:12px;color:var(--faint);font-family:var(--mono)}
+.crumb b{color:var(--muted);font-weight:500}
+.page-title{font-family:var(--serif);font-size:19px;line-height:1.15}
+.topbar-spacer{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{padding:5px 12px;font-size:12.5px;color:var(--muted);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:oklch(98% .005 85)}
+.icon-btn{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);
+  background:var(--surface);color:var(--muted)}
+.icon-btn:hover{color:var(--ink);border-color:var(--muted)}
+.icon-btn.danger-live{border-color:var(--coral);color:var(--coral);background:var(--coral-soft)}
+.hb{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.hb-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:hb 2.4s ease-in-out infinite}
+@keyframes hb{0%,100%{box-shadow:0 0 0 0 oklch(50% .12 152 / .45)}50%{box-shadow:0 0 0 5px oklch(50% .12 152 / 0)}}
+.hb.paused .hb-dot{background:var(--faint);animation:none}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--ink);color:oklch(98% .005 85);
+  display:grid;place-items:center;font-size:11.5px;font-weight:600;letter-spacing:.02em}
+.view{flex:1;overflow-y:auto;padding:24px 26px 60px;scroll-behavior:smooth}
+body.is-mobile .view{padding:14px 14px 96px}
+.view-inner{max-width:1240px;margin:0 auto}
+body.is-mobile .view-inner{max-width:none}
+
+/* ============ primitives ============ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 15px;border-radius:8px;
+  font-size:13.5px;font-weight:530;border:1px solid transparent;transition:all var(--t-fast);white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--teal);color:oklch(98% .005 85)}
+.btn-primary:hover:not(:disabled){background:var(--teal-strong)}
+.btn-ghost{border-color:var(--line);background:var(--surface);color:var(--ink)}
+.btn-ghost:hover:not(:disabled){border-color:var(--muted)}
+.btn-danger{border-color:oklch(88% .05 25);background:var(--surface);color:var(--coral)}
+.btn-danger:hover:not(:disabled){background:var(--coral-soft);border-color:var(--coral)}
+.btn-sm{padding:5px 11px;font-size:12.5px;border-radius:7px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m)}
+.panel.pad{padding:var(--pad)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:520;padding:2px 9px;border-radius:99px;
+  border:1px solid transparent;white-space:nowrap}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--green-soft);color:var(--green-ink)}
+.pill.warn{background:var(--amber-soft);color:var(--amber-ink)}
+.pill.risk{background:var(--coral-soft);color:var(--coral-ink)}
+.pill.info{background:var(--teal-soft);color:var(--teal-ink)}
+.pill.plain{background:var(--surface-2);color:var(--muted);border-color:var(--line-soft)}
+.sig{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.sig.funding{background:oklch(94% .03 30);color:oklch(44% .13 30)}
+.sig.hiring{background:oklch(94% .028 260);color:oklch(42% .11 260)}
+.sig.product{background:oklch(94% .028 152);color:oklch(40% .1 152)}
+.sig.content{background:oklch(94% .03 80);color:oklch(45% .1 80)}
+.sig.pricing{background:oklch(94% .026 330);color:oklch(44% .11 330)}
+.warmth{display:inline-flex;gap:3px;align-items:center}
+.warmth i{width:5px;height:5px;border-radius:50%;background:var(--line)}
+.warmth.w2 i:nth-child(-n+2){background:var(--amber)}
+.warmth.w3 i{background:var(--coral)}
+.warmth span{font-size:11px;color:var(--muted);margin-left:3px}
+.mono-chip{font-family:var(--mono);font-size:10.5px;background:var(--surface-2);border:1px solid var(--line-soft);
+  border-radius:5px;padding:2px 7px;color:var(--muted)}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:26px 0 10px}
+.sec-h:first-child{margin-top:0}
+.sec-h h2{font-family:var(--serif);font-size:16.5px;font-weight:500}
+.sec-h .link{font-size:12.5px}
+.empty{border:1.5px dashed var(--line);border-radius:var(--r-m);padding:26px;text-align:center;color:var(--faint);font-size:13px}
+.split{display:grid;gap:16px}
+.split.c2{grid-template-columns:1fr 1fr}
+.split.c21{grid-template-columns:1.9fr 1fr}
+@media (max-width:1100px){.split.c2,.split.c21{grid-template-columns:1fr}}
+
+/* ============ TODAY ============ */
+.brief{padding:22px 24px;border-left:3px solid var(--teal)}
+.brief .kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-strong);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.brief p{font-family:var(--serif);font-size:19.5px;line-height:1.5;max-width:64ch;text-wrap:pretty}
+.brief p b{font-weight:600}
+.brief .stamp{margin-top:10px;display:flex;gap:14px;color:var(--faint);font-family:var(--mono);font-size:10.5px}
+.decision-hero{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:18px 20px}
+.decision-hero .sub{color:var(--muted);font-size:13px;margin-top:3px}
+.dec-cta{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.wait-note{font-family:var(--mono);font-size:10.5px;color:var(--amber-ink);text-align:center}
+.nba-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;padding:10px 12px;
+  border-bottom:1px solid var(--line-soft);cursor:pointer;border-radius:6px}
+.nba-row:last-child{border-bottom:0}
+.nba-row:hover{background:var(--surface-2)}
+.score{font-family:var(--mono);font-size:15px;color:var(--teal-ink);font-weight:600;width:34px;text-align:right}
+.score small{display:block;font-size:9px;color:var(--faint);font-weight:400;letter-spacing:.08em}
+.delta{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line-soft)}
+.delta:last-child{border-bottom:0}
+.delta-ic{width:26px;height:26px;border-radius:7px;background:var(--green-soft);color:var(--green-ink);display:grid;place-items:center;margin-top:2px}
+.delta b{font-weight:560}
+.delta .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+.funnel{display:flex;align-items:flex-end;gap:5px;padding:6px 2px 0}
+.funnel .step{flex:1;min-width:0}
+.funnel .bar{background:var(--teal-soft);border-top:2px solid var(--teal);border-radius:3px 3px 0 0;transition:height var(--t-med)}
+.funnel .lbl{font-family:var(--mono);font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin-top:6px;text-align:center}
+.funnel .num{font-family:var(--mono);font-size:12.5px;text-align:center;color:var(--ink);font-weight:500}
+.funnel .arr-cta{margin-left:auto;text-align:right;font-family:var(--mono);font-size:12px;color:var(--teal-strong)}
+.tl{list-style:none}
+.tl li{position:relative;padding:0 0 16px 22px;border-left:1px solid var(--line)}
+.tl li:last-child{border-left-color:transparent;padding-bottom:2px}
+.tl li::before{content:"";position:absolute;left:-4.5px;top:4px;width:8px;height:8px;border-radius:50%;
+  background:var(--surface);border:2px solid var(--faint)}
+.tl li.ok::before{border-color:var(--green)} .tl li.warn::before{border-color:var(--amber)} .tl li.risk::before{border-color:var(--coral)} .tl li.info::before{border-color:var(--teal)}
+.tl .t{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+.tl .e{font-size:13px;margin-top:1px}
+.tl .e b{font-weight:560}
+.tl .o{font-size:12px;color:var(--muted)}
+
+/* ============ OPPORTUNITIES ============ */
+.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.search{flex:1;min-width:180px;display:flex;align-items:center;gap:8px;background:var(--surface);
+  border:1px solid var(--line);border-radius:8px;padding:0 10px;height:36px}
+.search input{border:0;outline:0;background:none;flex:1;font-size:13.5px}
+.search input::placeholder{color:var(--faint)}
+.sel,.select{appearance:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;height:36px;
+  padding:0 26px 0 10px;font-size:12.5px;color:var(--ink);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23777' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center}
+.chip{font-size:12px;padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--muted)}
+.chip:hover{border-color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--ink);color:oklch(98% .005 85);border-color:var(--ink)}
+.opp-row{display:grid;grid-template-columns:34px 1.5fr 1.1fr 62px 46px 60px 1.15fr 108px;gap:10px;align-items:center;
+  min-height:var(--row-h);padding:8px 12px;border-bottom:1px solid var(--line-soft);cursor:pointer;border-left:2px solid transparent}
+.opp-row:last-child{border-bottom:0}
+.opp-row:hover{background:var(--surface-2)}
+.opp-row.hot{border-left-color:var(--teal)}
+.opp-row .co{font-weight:570;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp-row .ct{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mono-cell{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.mono-cell b{color:var(--ink);font-weight:600}
+.str{display:flex;align-items:center;gap:6px}
+.str .meter{width:34px;margin:0}
+.opp-head{display:grid;grid-template-columns:34px 1.5fr 1.1fr 62px 46px 60px 1.15fr 108px;gap:10px;padding:6px 12px;
+  font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint)}
+.opp-detail{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+.opp-detail .col{display:grid;gap:16px}
+.dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12.5px}
+.dl dt{color:var(--faint);font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;padding-top:2px}
+.dl dd{color:var(--ink)}
+.pathchip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line-soft);
+  border-radius:99px;padding:4px 10px;font-size:12px;margin:2px 4px 2px 0}
+.pathchip b{font-weight:600}
+.pathchip .arr{color:var(--teal-strong)}
+.what-if{display:flex;flex-wrap:wrap;gap:6px}
+.what-if .chip{cursor:default;font-size:11.5px;color:var(--muted)}
+.ident{display:flex;gap:12px;align-items:center}
+.ident .nm{font-weight:600;font-size:14.5px}
+.ident .rl{font-size:12px;color:var(--muted)}
+.co-ava{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:650;font-size:13px;flex:none;
+  border:1px solid oklch(88% .01 80 / .6)}
+.ct-ava{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:12.5px;flex:none}
+
+/* ============ ACTION REVIEW (3-pane) ============ */
+.review{display:grid;grid-template-columns:288px minmax(0,1fr) 316px;gap:16px;align-items:start}
+.rail{display:grid;gap:14px;position:sticky;top:0}
+.rail .panel{padding:13px 14px}
+.rail h4{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);margin-bottom:9px}
+.gr{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:12.5px}
+.gr svg.ic{width:14px;height:14px;color:var(--green);margin-top:2px}
+.gr .d{color:var(--muted);font-size:11.5px}
+.alt{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line-soft)}
+.alt:last-child{border-bottom:0}
+.alt .sc{font-family:var(--mono);color:var(--muted)}
+.alt .meter{grid-column:1/-1;margin-top:2px}
+.editor{display:grid;gap:14px}
+.editor .panel{padding:16px 18px}
+.ed-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.field{margin-top:14px}
+.field label{display:block;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);margin-bottom:6px}
+.field .hint{float:right;font-family:var(--sans);text-transform:none;letter-spacing:0;font-size:11px}
+input.subject,textarea.body{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;
+  padding:9px 11px;font-size:14px;transition:border var(--t-fast)}
+input.subject{font-weight:600}
+textarea.body{min-height:250px;line-height:1.62;resize:vertical}
+input.subject:focus,textarea.body:focus{outline:none;border-color:var(--teal);background:var(--surface)}
+.edited-badge{display:none;align-items:center;gap:5px;font-size:11px;color:var(--teal-ink);background:var(--teal-soft);
+  border-radius:5px;padding:2px 8px}
+.edited-badge.on{display:inline-flex}
+.why-rank{counter-reset:why}
+.why-rank .it{display:grid;grid-template-columns:20px 1fr;gap:9px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.why-rank .it:last-child{border-bottom:0}
+.why-rank .it::before{counter-increment:why;content:counter(why);font-family:var(--mono);font-size:10.5px;color:var(--teal-strong);
+  border:1px solid var(--teal);border-radius:50%;width:18px;height:18px;display:grid;place-items:center;margin-top:2px}
+.why-rank .sub{color:var(--muted);font-size:11.5px;margin-top:2px}
+.approve-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.note-input{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);
+  border-radius:8px;height:38px;padding:0 11px}
+.note-input input{border:0;outline:0;background:none;flex:1;font-size:13px}
+.confirm-sheet{border:1px solid var(--teal);box-shadow:var(--sh-2)}
+.confirm-sheet .head{display:flex;gap:10px;align-items:center;background:var(--teal-soft);border-radius:var(--r-m) var(--r-m) 0 0;
+  padding:12px 16px;color:var(--teal-ink);font-weight:570}
+.confirm-list{list-style:none;padding:6px 16px 14px}
+.confirm-list li{display:grid;grid-template-columns:auto 1fr;gap:9px;padding:7px 0;font-size:13px;border-bottom:1px solid var(--line-soft)}
+.confirm-list li:last-child{border-bottom:0}
+.confirm-list .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);padding-top:3px;width:86px}
+.done-panel{text-align:center;padding:34px 20px}
+.done-panel .ring{width:52px;height:52px;border-radius:50%;background:var(--green-soft);color:var(--green-ink);
+  display:grid;place-items:center;margin:0 auto 12px}
+.done-panel h3{font-family:var(--serif);font-size:19px;font-weight:500}
+.done-panel .sub{color:var(--muted);font-size:13px;max-width:46ch;margin:6px auto 0}
+
+/* ============ ACTIVITY ============ */
+.ledger{position:relative;padding-left:6px}
+.ev{border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);margin-bottom:10px;overflow:hidden}
+.ev-h{display:grid;grid-template-columns:64px 44px 1fr auto auto auto;gap:12px;align-items:center;padding:10px 14px;cursor:pointer}
+.ev-h:hover{background:var(--surface-2)}
+.ev-h .time{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.actor{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:2px 0;width:42px;text-align:center}
+.actor.agent{background:var(--teal-soft);color:var(--teal-ink)}
+.actor.user{background:oklch(94% .012 60);color:var(--muted)}
+.actor.sys{background:var(--surface-2);color:var(--faint)}
+.ev-b{display:none;border-top:1px solid var(--line-soft);padding:14px 16px;background:var(--surface-2)}
+.ev.open .ev-b{display:block}
+.ev-b .trace-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.tkv{background:var(--surface);border:1px solid var(--line-soft);border-radius:8px;padding:8px 11px;font-size:12px}
+.tkv .k{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint)}
+.tkv .v{margin-top:2px}
+
+/* ============ TRACE OVERLAY (loop chart) ============ */
+.overlay{position:fixed;inset:0;background:oklch(25% .02 60 / .45);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
+.overlay.show{display:flex}
+.trace-modal{background:var(--surface);border-radius:var(--r-l);box-shadow:var(--sh-2);max-width:1020px;width:100%;
+  max-height:88vh;overflow-y:auto;border:1px solid var(--line)}
+.trace-head{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);z-index:2}
+.loop{display:flex;gap:0;align-items:stretch;padding:22px 22px 8px;overflow-x:auto}
+.loop .st{display:grid;grid-template-rows:auto auto auto;justify-items:center;gap:7px;min-width:86px;position:relative;flex:1}
+.loop .st .nd{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);background:var(--surface);
+  display:grid;place-items:center;color:var(--faint);position:relative;z-index:1;font-family:var(--mono);font-size:11px}
+.loop .st:not(:last-child)::after{content:"";position:absolute;top:17px;left:calc(50% + 20px);right:calc(-50% + 20px);
+  border-top:2px solid var(--line);transition:border var(--t-med)}
+.loop .st.done .nd{border-color:var(--teal);color:var(--teal-strong);background:var(--teal-soft)}
+.loop .st.done:not(:last-child)::after{border-color:var(--teal)}
+.loop .st.now .nd{border-color:var(--amber);color:var(--amber-ink);background:var(--amber-soft);animation:hb 2.4s infinite}
+.loop .st .nm{font-size:11px;font-weight:560}
+.loop .st .dt{font-family:var(--mono);font-size:9.5px;color:var(--faint)}
+.loop .st.clickable{cursor:pointer}
+.loop .st.clickable:hover .nd{transform:scale(1.12)}
+.trace-detail{margin:8px 22px 22px;border-top:1px solid var(--line-soft);padding-top:16px}
+.trace-detail h4{font-family:var(--serif);font-size:15.5px;margin-bottom:8px}
+
+/* ============ LEARNING ============ */
+.ba{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:stretch}
+.msg-card{border:1px solid var(--line);border-radius:var(--r-m);background:var(--surface);padding:14px 16px}
+.msg-card.before{background:var(--surface-2)}
+.msg-card .tag{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);margin-bottom:8px}
+.msg-card .subj{font-weight:600;font-size:13px;margin-bottom:6px}
+.msg-card .body{font-size:12.5px;color:var(--muted);line-height:1.6}
+.msg-card .body .cut{display:block;overflow:hidden;position:relative}
+.msg-card .body .cut::after{content:"";position:absolute;inset:auto 0 0 0;height:34px;background:linear-gradient(transparent,var(--surface-2))}
+.ba-arrow{display:grid;place-items:center;color:var(--teal-strong);font-size:12px;text-align:center;gap:6px;min-width:110px}
+.ba-arrow .why{font-size:11px;color:var(--muted);line-height:1.45}
+.param{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.param:last-child{border-bottom:0}
+.param .mono-val{font-family:var(--mono);font-size:11.5px}
+.param .chg{color:var(--green-ink);font-family:var(--mono);font-size:11px}
+.vt{width:100%;border-collapse:collapse;font-size:12.5px}
+.vt th{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);
+  text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+.vt td{padding:8px 10px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+.vt tr:last-child td{border-bottom:0}
+.vt .fav td{background:var(--teal-soft)}
+.ci{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.fb-row{display:grid;grid-template-columns:130px 1fr auto;gap:10px;align-items:center;padding:6px 0;font-size:12.5px;border-bottom:1px solid var(--line-soft)}
+.fb-row:last-child{border-bottom:0}
+.pol{display:grid;grid-template-columns:auto 1fr auto auto;gap:14px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line-soft)}
+.pol:last-child{border-bottom:0}
+.pol .v{font-family:var(--mono);font-size:12px;color:var(--teal-ink);font-weight:600;width:38px}
+.pol .what b{font-weight:570;font-size:13.5px}
+.pol .what .sub{color:var(--muted);font-size:12px;margin-top:2px}
+
+/* ============ RELATIONSHIPS ============ */
+.rel-grid{display:grid;grid-template-columns:230px minmax(0,1fr) 280px;gap:16px;align-items:start}
+.conn{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line-soft);cursor:pointer;border-radius:6px}
+.conn:hover{background:var(--surface-2)}
+.conn:last-child{border-bottom:0}
+.graph-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden}
+.graph-wrap svg{display:block;width:100%;height:auto}
+.g-node{cursor:pointer}
+.g-node circle{transition:r var(--t-fast),stroke-width var(--t-fast)}
+.g-node:hover circle{stroke-width:3}
+.g-node text{font-size:11px;font-family:var(--sans);fill:var(--ink)}
+.g-node .role{font-size:9px;fill:var(--muted)}
+.g-edge{stroke:var(--line);fill:none;stroke-width:1.5}
+.g-edge.m2{stroke:oklch(70% .09 75);stroke-width:2.2}
+.g-edge.m3{stroke:oklch(62% .12 40);stroke-width:3}
+.g-edge.sel{stroke:var(--teal);stroke-width:3;stroke-dasharray:7 5;animation:dash 1.2s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-12}}
+.legend{display:flex;gap:14px;padding:9px 14px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;border-top:2.5px solid var(--line);vertical-align:middle;margin-right:5px;border-radius:2px}
+.legend .l2 i{border-color:oklch(70% .09 75)} .legend .l3 i{border-color:oklch(62% .12 40)} .legend .ls i{border-color:var(--teal);border-top-style:dashed}
+.intro-path{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:var(--teal-soft);border-radius:8px;margin-bottom:12px}
+.intro-path .n{background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:4px 11px;font-size:12px;font-weight:570}
+.intro-path .n.first{border-color:var(--teal);color:var(--teal-ink)}
+.decay{display:flex;align-items:center;gap:8px}
+.decay .track{flex:1;height:5px;border-radius:99px;background:var(--line-soft);overflow:hidden}
+.decay .track>i{display:block;height:100%;background:var(--amber);border-radius:99px}
+
+/* ============ SETTINGS ============ */
+.set-grid{display:grid;grid-template-columns:220px 1fr;gap:20px;align-items:start}
+.set-nav{position:sticky;top:0;display:grid;gap:2px}
+.set-nav button{text-align:left;padding:7px 11px;border-radius:7px;color:var(--muted);font-size:13px}
+.set-nav button:hover{background:var(--surface-2);color:var(--ink)}
+.set-nav button[aria-current="true"]{background:var(--surface);border:1px solid var(--line);color:var(--ink);font-weight:560}
+.set-sec{margin-bottom:26px;scroll-margin-top:70px}
+.set-sec h3{font-family:var(--serif);font-size:16px;padding-bottom:8px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.set-row{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line-soft)}
+.set-row:last-child{border-bottom:0}
+.set-row .d{font-size:12px;color:var(--muted);margin-top:2px;max-width:56ch}
+.switch{position:relative;width:38px;height:22px;border-radius:99px;background:var(--line);transition:background var(--t-med);flex:none}
+.switch::after{content:"";position:absolute;top:2.5px;left:3px;width:17px;height:17px;border-radius:50%;background:var(--surface);box-shadow:var(--sh-1);transition:left var(--t-med)}
+.switch[aria-checked="true"]{background:var(--teal)}
+.switch[aria-checked="true"]::after{left:18px}
+.switch:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.range{width:180px;accent-color:var(--teal)}
+.preview{background:var(--ink);color:oklch(96% .008 85);border-radius:var(--r-m);padding:18px 20px;font-size:14px;line-height:1.65}
+.preview .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:oklch(70% .01 85);margin-bottom:8px}
+.preview b{color:oklch(85% .07 178);font-weight:600}
+.code{font-family:var(--mono);font-size:11.5px;line-height:1.7;background:var(--surface-2);border:1px solid var(--line-soft);
+  border-radius:8px;padding:14px;overflow-x:auto;color:var(--muted);white-space:pre}
+.code .k{color:var(--teal-strong)} .code .s{color:oklch(50% .1 25)} .code .n{color:oklch(50% .09 152)}
+
+/* ============ TOASTS ============ */
+#toasts{position:fixed;left:20px;bottom:20px;display:grid;gap:8px;z-index:100;max-width:360px}
+.toast{background:var(--ink);color:oklch(97% .006 85);border-radius:10px;padding:11px 14px;font-size:13px;
+  box-shadow:var(--sh-2);display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;
+  animation:tin .3s cubic-bezier(.2,.7,.2,1)}
+.toast svg.ic{width:15px;height:15px}
+.toast.ok svg.ic{color:oklch(75% .13 152)} .toast.info svg.ic{color:oklch(78% .09 178)} .toast.risk svg.ic{color:oklch(72% .15 25)}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+.toast.out{opacity:0;transform:translateY(6px);transition:all .25s}
+
+/* ============ TWEAKS ============ */
+#tweaks{position:fixed;right:18px;bottom:18px;z-index:90}
+.tweaks-fab{width:40px;height:40px;border-radius:12px;background:var(--ink);color:oklch(97% .006 85);
+  display:grid;place-items:center;box-shadow:var(--sh-2)}
+.tweaks-fab svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round}
+.tweaks-panel{position:absolute;right:0;bottom:50px;width:248px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-m);box-shadow:var(--sh-2);padding:14px;display:none}
+.tweaks-panel.show{display:block}
+.tweaks-panel h5{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--faint);margin-bottom:10px}
+.tw-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;font-size:12.5px;border-bottom:1px solid var(--line-soft)}
+.tw-row:last-child{border-bottom:0}
+
+/* ============ WIREFRAME MODE ============ */
+body.wireframe #app{filter:grayscale(1) contrast(.92)}
+body.wireframe [data-wf]{position:relative;outline:1px dashed oklch(60% 0 0);outline-offset:5px}
+body.wireframe [data-wf]::after{content:attr(data-wf);position:absolute;top:-9px;left:8px;z-index:60;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;
+  background:oklch(60% 0 0);color:oklch(98% 0 0);padding:1px 6px;border-radius:3px}
+body.wireframe .toast,body.wireframe #tweaks{filter:none}
+
+/* ============ MOBILE (body.is-mobile, synced with matchMedia; also forceable via Tweaks) ============ */
+.bottom-nav{display:none}
+body.is-mobile .bottom-nav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--surface);
+  border-top:1px solid var(--line);padding:6px 8px calc(8px + env(safe-area-inset-bottom))}
+body.is-mobile .bottom-nav button{flex:1;display:grid;justify-items:center;gap:3px;font-size:10px;color:var(--muted);padding:5px 0;border-radius:8px}
+body.is-mobile .bottom-nav button[aria-current="page"]{color:var(--teal-ink);background:var(--teal-soft)}
+body.is-mobile .bottom-nav .count{font-family:var(--mono);font-size:8.5px;background:var(--amber-soft);color:var(--amber-ink);border-radius:99px;padding:0 5px;margin-left:4px}
+body.is-mobile .review{grid-template-columns:1fr}
+body.is-mobile .rail{position:static}
+body.is-mobile .opp-row{grid-template-columns:30px 1fr auto;grid-template-areas:"ava co score" "ava ct score" "ava sig score";row-gap:1px}
+body.is-mobile .opp-head{display:none}
+body.is-mobile .opp-row>:nth-child(4),body.is-mobile .opp-row>:nth-child(n+5):not(.score){display:none}
+body.is-mobile .opp-row>:nth-child(1){grid-area:ava}
+body.is-mobile .opp-row>:nth-child(2){grid-area:co}
+body.is-mobile .opp-row>:nth-child(2) .ct{grid-area:ct;display:block}
+body.is-mobile .opp-row>:nth-child(3){grid-area:sig}
+body.is-mobile .opp-row>.score{grid-area:score;align-self:center}
+body.is-mobile .opp-detail{grid-template-columns:1fr}
+body.is-mobile .split.c2,body.is-mobile .split.c21{grid-template-columns:1fr}
+body.is-mobile .brief p{font-size:16.5px}
+body.is-mobile .decision-hero{grid-template-columns:1fr}
+body.is-mobile .ba{grid-template-columns:1fr}
+body.is-mobile .ba-arrow{min-height:40px}
+body.is-mobile .rel-grid{grid-template-columns:1fr}
+body.is-mobile .set-grid{grid-template-columns:1fr}
+body.is-mobile .set-nav{position:static;grid-auto-flow:column;overflow-x:auto;padding-bottom:6px}
+body.is-mobile .ev-h{grid-template-columns:52px 1fr auto;row-gap:4px}
+body.is-mobile .ev-h>*:nth-child(n+5){display:none}
+body.is-mobile .loop{padding:16px 12px 4px}
+body.is-mobile .loop .st{min-width:64px}
+body.is-mobile .approve-bar{position:sticky;bottom:64px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:10px;box-shadow:0 -6px 24px oklch(25% .02 60 / .08);margin-top:10px}
+body.is-mobile #tweaks{bottom:76px}
+body.is-mobile .funnel{overflow-x:auto}
+body.forced .view-inner{max-width:390px;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+
+/* boot flag: visible ONLY if JS never runs (JS hides it immediately) */
+#bootflag{display:block;margin:14px;padding:12px 16px;border:1px solid #c0564a;border-radius:10px;background:#f8e7e4;color:#7c3328;font-size:13.5px}
+/* hex fallback for webviews without oklch() */
+@supports not (color: oklch(50% .1 180)){
+  :root{--bg:#f4f1ea;--surface:#fefdfb;--surface-2:#f8f5ee;--ink:#38332a;--muted:#6f6a5e;--faint:#98917f;
+    --line:#ded8c9;--line-soft:#e8e3d6;--teal:#2f7d73;--teal-strong:#256f66;--teal-ink:#1d5a52;--teal-soft:#dcebe8;
+    --amber:#c2913f;--amber-soft:#f5edd9;--amber-ink:#8a6a2f;--green:#3f9a6b;--green-soft:#e6f3ea;--green-ink:#2c7a52;
+    --coral:#c0564a;--coral-soft:#f8e7e4;--coral-ink:#a33d33}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><path d="M4 17h16M6.5 17a5.5 5.5 0 0 1 11 0"/><path d="M12 7V5M5.6 9.2 4.2 7.8M18.4 9.2l1.4-1.4"/></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 12 7.4 7.4M12 4a8 8 0 1 1-8 8"/><path d="M12 7.5a4.5 4.5 0 1 1-4.5 4.5" opacity=".55"/></symbol>
+  <symbol id="i-stamp" viewBox="0 0 24 24"><circle cx="12" cy="10" r="5.5"/><path d="m9.5 14.5-1.5 6h8l-1.5-6"/><path d="m10 10 1.6 1.6L14.5 8.6"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6h5"/></symbol>
+  <symbol id="i-loopa" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 1 2.3 5.7"/><path d="M4 18v-5h5"/></symbol>
+  <symbol id="i-nodes" viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.4"/><circle cx="18" cy="10" r="2.4"/><circle cx="9" cy="18" r="2.4"/><path d="M8.2 8.2 15.8 9.6M7.3 9.2l1 6.6M16.6 12 10.8 16.8"/></symbol>
+  <symbol id="i-slid" viewBox="0 0 24 24"><path d="M5 8h14M5 16h14"/><circle cx="10" cy="8" r="2.2" fill="var(--surface)"/><circle cx="15" cy="16" r="2.2" fill="var(--surface)"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="m4.5 7.5 7.5 6 7.5-6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M4 17l5.5-6 4 3.5L20 7"/><path d="M15 7h5v5"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M6 21V4"/><path d="M6 5c5-2.5 7.5 2 12 .5v9c-4.5 1.5-7-3-12-.5"/></symbol>
+  <symbol id="i-tune" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.2"/></symbol>
+</svg>
+
+<div id="bootflag" role="alert">Loop’s interface needs JavaScript — it isn’t running in this preview. Open <b>loop-console.html</b> in a full browser tab.</div>
+<div id="app" data-wf="SHELL / APP SHELL">
+  <aside class="sidebar" data-wf="LEFT NAV + AGENT STATUS" aria-label="Primary">
+    <div class="brand"><div class="brand-mark">L</div><div class="brand-name">Loop</div></div>
+    <button class="ws-switch" data-a="noop"><span>Kestrel Labs</span><span class="mono">GT-01</span></button>
+    <nav class="nav" id="nav" aria-label="Areas"></nav>
+    <div class="status-card" data-wf="AGENT STATUS / BUDGET / SAFETY" id="statusCard"></div>
+  </aside>
+  <div class="main">
+    <header class="topbar" data-wf="TOP BAR — MODE / PAUSE / HEARTBEAT" id="topbar"></header>
+    <main class="view" id="view" tabindex="-1"></main>
+  </div>
+  <nav class="bottom-nav" id="bottomNav" aria-label="Mobile"></nav>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+<div class="overlay" id="overlay" role="dialog" aria-modal="true"></div>
+
+<div id="tweaks">
+  <button class="tweaks-fab" data-a="tweaks" aria-label="Design tweaks" aria-expanded="false"><svg><use href="#i-tune"/></svg></button>
+  <div class="tweaks-panel" id="tweaksPanel" role="dialog" aria-label="Design tweaks">
+    <h5>Tweaks</h5>
+    <div class="tw-row"><span>Wireframe mode</span><button class="switch" role="switch" aria-checked="false" data-t="wireframe" aria-label="Wireframe mode"></button></div>
+    <div class="tw-row"><span>Accent</span>
+      <div class="seg" style="height:28px"><button class="btn btn-sm" style="padding:3px 9px" data-a="accent" data-v="teal" aria-pressed="true">Teal</button><button class="btn btn-sm" style="padding:3px 9px" data-a="accent" data-v="blue" aria-pressed="false">Blue</button></div></div>
+    <div class="tw-row"><span>Compact density</span><button class="switch" role="switch" aria-checked="false" data-t="compact" aria-label="Compact density"></button></div>
+    <div class="tw-row"><span>Force mobile frame</span><button class="switch" role="switch" aria-checked="false" data-t="forced" aria-label="Force mobile frame"></button></div>
+    <div class="tw-row"><span>Reset demo data</span><button class="btn btn-ghost btn-sm" data-a="reset">Reset</button></div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   LOOP — prototype runtime.
+   Comment convention: each block names the component from DESIGN.md and
+   its states. Data mirrors src/lib/api/client.ts shapes (Opportunity,
+   Action, DecisionTrace, WarmEdge, Policy, VariantStats) so the React
+   build maps 1:1 onto GET /api/v1/*.
+   ===================================================================== */
+'use strict';
+/* boot diagnostics: hide the static no-JS flag; surface any fatal error visibly instead of a silent shell */
+try{var _bf=document.getElementById('bootflag');if(_bf)_bf.style.display='none';}catch(e){}
+window.addEventListener('error',function(e){try{var v=document.getElementById('view');
+  if(v&&!v.innerHTML.trim()){v.innerHTML='<div class="view-inner"><div class="panel pad" style="border-color:#c0564a"><b style="font-family:Georgia,serif;font-size:16px">Loop hit an error while starting</b><pre style="font:11px/1.6 ui-monospace,Menlo,monospace;white-space:pre-wrap;margin:10px 0 0;color:#6f6a5e">'+String(e.message||e).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+'</pre></div></div>';}}catch(x){}});
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const icon=(n,cls='')=>`<svg class="ic ${cls}" aria-hidden="true"><use href="#${n}"/></svg>`;
+
+/* ---------------- synthetic dataset (mirrors API types) ---------------- */
+const DB={
+  workspace:'Kestrel Labs', operator:'Jordan Reyes',
+  companies:{
+    acme:{name:'Acme Analytics',domain:'acmeanalytics.co',seg:'SaaS · Analytics',size:'84 seats',arr:'$8–12M ARR',loc:'Austin',icp:92,color:'oklch(80% .09 200)'},
+    fathom:{name:'Fathom ML',domain:'fathomml.io',seg:'SaaS · ML tooling',size:'22 seats',arr:'$1–3M ARR',loc:'San Francisco',icp:88,color:'oklch(78% .1 152)'},
+    drift:{name:'Driftwood Retail',domain:'driftwoodhome.com',seg:'eCommerce · Home',size:'60 seats',arr:'$4–6M ARR',loc:'Portland',icp:74,color:'oklch(78% .12 60)'},
+    cobalt:{name:'Cobalt Health',domain:'cobalthealth.com',seg:'SaaS · HealthTech',size:'210 seats',arr:'$15–22M ARR',loc:'Boston',icp:81,color:'oklch(75% .1 260)'},
+    elmoak:{name:'Elm & Oak',domain:'elmandoak.nyc',seg:'Agency · Brand',size:'18 seats',arr:'$1–2M ARR',loc:'New York',icp:58,color:'oklch(80% .11 40)'},
+    bravado:{name:'Bravado Freight',domain:'bravadofreight.com',seg:'Logistics',size:'340 seats',arr:'$25–40M ARR',loc:'Chicago',icp:63,color:'oklch(70% .09 30)'},
+    harbor:{name:'Harborline',domain:'harborline.io',seg:'Maritime tech',size:'45 seats',arr:'$2–4M ARR',loc:'Seattle',icp:49,color:'oklch(75% .08 220)'}
+  },
+  contacts:{
+    ava:{name:'Ava Chen',role:'VP Growth',co:'acme',email:'ava.chen@acmeanalytics.co',note:'Took over growth in Jan · ex-Northbeam'},
+    ben:{name:'Ben Osei',role:'Co-founder',co:'fathom',email:'ben@fathomml.io',note:'Writes the changelog personally'},
+    mara:{name:'Mara Voss',role:'eCommerce Director',co:'drift',email:'mara@driftwoodhome.com',note:'Owns paid + retention'},
+    priya:{name:'Priya Nair',role:'Head of Ops',co:'cobalt',email:'priya.nair@cobalthealth.com',note:'Scaling ops for 210 seats'},
+    sophie:{name:'Sophie Laurent',role:'Managing Partner',co:'elmoak',email:'sophie@elmandoak.nyc',note:'Seed-stage brand agency'},
+    leo:{name:'Leo Marsh',role:'COO',co:'bravado',email:'leo@bravadofreight.com',note:'Cost-obsessed operator'},
+    marcus:{name:'Marcus Reed',role:'Product lead · ex-Northbeam',co:null,email:'marcus.reed@dgmail.com',note:'Worked with Ava for 2 years'},
+    dana:{name:'Dana Ruiz',role:'Fractional GTM lead',co:null,email:'dana@danaruiz.co',note:'Ran Driftwood\u2019s CAC audit'}
+  },
+  /* Opportunity.status mirrors client.ts: QUALIFIED|PLANNED|PROPOSED|… */
+  opps:[
+    {id:'OPP-1042',co:'acme',ct:'ava',sig:{type:'funding',label:'Series B · $32M',age:'2d',strength:86},
+     icp:92,warm:3,nextBest:94,status:'PROPOSED',statusLabel:'Action ready',action:'Warm intro email via Marcus',why:'Fresh raise + warm path + peak fit'},
+    {id:'OPP-1039',co:'fathom',ct:'ben',sig:{type:'product',label:'Trials 3\u00d7 in 10 days',age:'1d',strength:72},
+     icp:88,warm:1,nextBest:86,status:'QUALIFIED',statusLabel:'Researching',action:'Founder-to-founder email',why:'Usage spike, tiny window'},
+    {id:'OPP-1036',co:'drift',ct:'mara',sig:{type:'content',label:'Podcast: \u201cwe waste 30% on Meta\u201d',age:'3d',strength:58},
+     icp:74,warm:2,nextBest:79,status:'PLANNED',statusLabel:'Draft ready',action:'CAC case study + Dana intro',why:'Named pain, warm via Dana'},
+    {id:'OPP-1031',co:'cobalt',ct:'priya',sig:{type:'hiring',label:'4 growth roles posted',age:'5d',strength:64},
+     icp:81,warm:2,nextBest:77,status:'PLANNED',statusLabel:'Draft ready',action:'Ops checklist + Dana intro',why:'Scaling pain, ICP strong'},
+    {id:'OPP-1027',co:'elmoak',ct:'sophie',sig:{type:'funding',label:'Seed extension rumored',age:'9d',strength:39},
+     icp:58,warm:2,nextBest:61,status:'SKIPPED',statusLabel:'On hold · budget',action:'—',why:'Below budget bar this week'},
+    {id:'OPP-1019',co:'bravado',ct:'leo',sig:{type:'pricing',label:'Fuel surcharge news',age:'6d',strength:44},
+     icp:63,warm:1,nextBest:54,status:'QUALIFIED',statusLabel:'Researching',action:'—',why:'Cost pain, weak fit'},
+    {id:'OPP-1011',co:'harbor',ct:null,sig:{type:'product',label:'APAC expansion',age:'12d',strength:33},
+     icp:49,warm:1,nextBest:41,status:'SKIPPED',statusLabel:'Snoozed 14d',action:'—',why:'Timing + fit below bar'}
+  ],
+  /* ACT-2214 — the golden-path action (mirrors Action + DecisionTrace) */
+  act:{id:'ACT-2214',opp:'OPP-1042',type:'OUTREACH_EMAIL',channel:'EMAIL',variant:'B \u2014 warm + short',
+    timing:'Tomorrow (Wed) 9:12 AM \u00b7 her local time',confidence:78,policy:14,
+    subject:'Congrats on the raise, Ava \u2014 one idea for Q3',
+    body:'Hi Ava,\n\nMarcus flagged the Series B \u2014 congratulations. Going from 8 to 40 heads in a year is the fun part and the hard part.\n\nOne thought before you scale spend: we made a 6-minute teardown of how B2B analytics teams trimmed CAC 15\u201325% in their first two quarters post-raise. Acme is one of the three examples.\n\nWorth a look now, or better after launch week?\n\n\u2014 Jordan',
+    altBody:null,
+    expect:[['Reply chance','14.6%',15],['Meeting chance','3.1%',4],['Simulated ARR','+$9.2k',9]],
+    guardrails:[['Frequency','First touch \u2014 last contact 214d ago'],['Daily budget','18 of 40 actions left today'],['Claims check','Teardown stats match source data'],['Sender reputation','96 / 100, no flags'],['Data source','Public + opt-in only']],
+    why:[['Reply windows to funding news peak on days 3\u20135. The raise was 2 days ago \u2014 sending tomorrow lands the peak.','41 tracked funding-reaction sends'],
+         ['Warm path found: Marcus Reed \u2192 Ava Chen. They worked together 2 years; Marcus\u2019s 3 intros all got replies.','WarmEdge WE-331 \u00b7 strength 0.86'],
+         ['ICP fit 92 \u2014 B2B analytics, 84 seats, hiring 4 growth roles, raising to scale spend.','ICP model v6'],
+         ['Variant B (warm + short) beats Variant A by +6.2 pts on warm paths.','Thompson posterior \u00b7 CI +2 to +11']],
+    alts:[['Wait 3 days, send Thursday instead',71],['LinkedIn DM only (no email)',63],['Do nothing for 14 days',12]],
+    whatIf:['No reply by Mar 20 \u2192 follow up Thursday 9 AM, then try Dana path','Marcus opts out \u2192 fall back to direct Variant A email','Round details wrong in coverage \u2192 pause 48h and re-verify'],
+    ev:[['ICP fit 92 / 100','B2B analytics \u00b7 84 seats \u00b7 4 growth roles open'],['Signal strength 86 / 100','$32M Series B led by Ridgeline, 2 days old'],['Warm path Marcus \u2192 Ava','0.86 \u00b7 worked together 2y \u00b7 3/3 intros replied'],['Timing','Day 2 post-raise \u00b7 send window opens tomorrow 9 AM']]
+  },
+  pendingDrift:{id:'ACT-2201',co:'drift',subject:'Mara \u2014 the 30% you mentioned on podcast'},
+  activity:[
+    {id:'EV-902',t:'09:41',actor:'AGENT',who:'Loop',co:'cobalt',event:'Sent ops checklist email',status:'ok',outcome:'Delivered',pol:14,reason:'Within autopilot scope'},
+    {id:'EV-901',t:'09:12',actor:'AGENT',who:'Loop',co:'drift',event:'Proposed case-study email',status:'warn',outcome:'Awaiting you',pol:14,reason:'Outside autopilot scope \u00b7 needs approval'},
+    {id:'EV-900',t:'08:55',actor:'AGENT',who:'Loop',co:'fathom',event:'Outcome recorded: reply, positive',status:'ok',outcome:'\u201cSend the deck\u201d \u2014 Ben Osei',pol:14,reason:'Feed \u2192 learning'},
+    {id:'EV-899',t:'08:30',actor:'AGENT',who:'Loop',co:'elmoak',event:'Guardrail block',status:'risk',outcome:'Held \u2014 weekly contact cap',pol:14,reason:'Rule: 1 touch / 7d / contact'},
+    {id:'EV-898',t:'17:02',actor:'AGENT',who:'Loop',co:null,event:'Policy v13 \u2192 v14 applied',status:'info',outcome:'Openers capped at 70 words',pol:14,reason:'3 \u00d7 \u201ctoo long\u201d rejections'},
+    {id:'EV-897',t:'16:48',actor:'USER',who:'You',co:'bravado',event:'Rejected draft',status:'info',outcome:'Reason: too long',pol:13,reason:'Feedback \u2192 policy v14'}
+  ],
+  variants:[
+    {id:'A',name:'Direct ask',sent:41,replies:4,rate:9.8,ci:[3.3,21.4],share:22,fav:false},
+    {id:'B',name:'Warm + short',sent:38,replies:7,rate:18.4,ci:[9.0,32.1],share:58,fav:true},
+    {id:'C',name:'Question opener',sent:29,replies:3,rate:10.3,ci:[2.7,26.0],share:14,fav:false},
+    {id:'D',name:'Resource-first',sent:12,replies:1,rate:8.3,ci:[1.2,33.1],share:6,fav:false}
+  ],
+  timing:[['Tue\u2013Thu \u00b7 9\u201311 AM',19.2],['Mon \u00b7 morning',10.7],['Fri \u00b7 afternoon',7.9]],
+  feedback:[['Too long',4],['Too salesy',3],['Wrong target',2],['Bad timing',1],['Not relevant now',1]],
+  policy:[{v:12,when:'Feb 18',what:'Banned-phrase list',sub:'\u201crevolutionary\u201d, \u201cgame-changer\u201d, \u201csynergy\u201d now blocked at draft time.',trig:'Your content guardrails edit'},
+    {v:13,when:'Mar 2',what:'Personalization depth \u2265 2',sub:'Every draft must cite two specifics about the company.',trig:'Low reply rate on generic drafts'},
+    {v:14,when:'Mar 11',what:'Shorter openers \u00b7 assertiveness \u2264 0.55',sub:'First paragraph capped at 70 words.',trig:'3 \u00d7 \u201ctoo long\u201d / \u201ctoo salesy\u201d rejections'},
+    {v:15,when:'Live',what:'Fast-reply priority on warm threads',sub:'Replies to warm-path emails jump the queue; respond within 2h window.',trig:'Outcome: Ava Chen replied positive',live:true}],
+  graph:{
+    nodes:[{id:'you',x:90,y:212,l1:'You',l2:'Jordan',kind:'you'},
+      {id:'marcus',x:298,y:110,l1:'Marcus Reed',l2:'strong \u00b7 0.86',kind:'conn'},
+      {id:'dana',x:298,y:330,l1:'Dana Ruiz',l2:'medium \u00b7 0.62',kind:'conn'},
+      {id:'ava',x:572,y:78,l1:'Ava Chen',l2:'Acme Analytics',kind:'target'},
+      {id:'ben',x:632,y:170,l1:'Ben Osei',l2:'Fathom ML',kind:'target'},
+      {id:'priya',x:640,y:258,l1:'Priya Nair',l2:'Cobalt Health',kind:'target'},
+      {id:'mara',x:566,y:336,l1:'Mara Voss',l2:'Driftwood',kind:'target'},
+      {id:'leo',x:610,y:400,l1:'Leo Marsh',l2:'Bravado',kind:'target'}],
+    edges:[{a:'you',b:'marcus',w:3},{a:'marcus',b:'ava',w:3},{a:'you',b:'dana',w:2},
+      {a:'dana',b:'mara',w:3},{a:'dana',b:'priya',w:2},{a:'marcus',b:'ben',w:1},{a:'you',b:'leo',w:1}]
+  },
+  rel:{ava:{path:['You','Marcus Reed','Ava Chen'],via:'marcus',strength:.74,source:'Colleagues at Northbeam \u00b7 2 years \u00b7 3 intros made, 3 replied',last:'6d ago',decay:78,fade:'~54 days to cool',why:'Marcus\u2019s intros to growth leaders have a 3/3 reply rate \u2014 and Ava just took over growth.'},
+       mara:{path:['You','Dana Ruiz','Mara Voss'],via:'dana',strength:.71,source:'Dana ran Driftwood\u2019s CAC audit \u00b7 monthly contact',last:'11d ago',decay:64,fade:'~40 days to cool',why:'Dana\u2019s audit is the exact opener for the CAC case study already drafted.'},
+       priya:{path:['You','Dana Ruiz','Priya Nair'],via:'dana',strength:.55,source:'Dana advised Cobalt\u2019s ops team last year',last:'23d ago',decay:41,fade:'~28 days to cool',why:'Ops-scaling pain is live \u2014 4 roles open. Dana can vouch credibly.'},
+       ben:{path:['You','Marcus Reed','Ben Osei'],via:'marcus',strength:.40,source:'Same angel group \u00b7 met once',last:'34d ago',decay:22,fade:'~15 days to cool',why:'Weak path \u2014 founder-to-founder direct email is currently winning instead.'}}
+};
+
+/* ---------------- runtime state (persisted) ---------------- */
+const DEFAULTS={route:'today',mode:'propose',paused:false,hb:6,
+  opp:{q:'',sig:'all',sort:'score',sel:null},
+  dec:{status:'pending',sub:'',body:'',note:'',reject:'',edited:false,regen:false,introQueued:false},
+  graphSel:'ava',actFilter:'all',setSection:'mode',
+  set:{chEmail:true,chLi:false,segSaas:true,segAgency:true,segLogi:false,budget:24,freq:'1 touch / 7 days',win:'Mon\u2013Fri \u00b7 9 AM\u20135 PM',sim:true,apolIntro:true,apolExt:true,apolBudget:true},
+  demo:{stage:0,outcome:false,policy:14}};
+/* hardened init: no structuredClone (old webviews), storage never throws, deep-merge stale state */
+const clone=o=>JSON.parse(JSON.stringify(o));
+const loadJSON=k=>{try{return JSON.parse(localStorage.getItem(k)||'{}')}catch(e){return {}}};
+function hydrate(base,over){for(const k in over){if(over[k]&&typeof over[k]==='object'&&base[k]&&typeof base[k]==='object'&&!Array.isArray(base[k]))hydrate(base[k],over[k]);else base[k]=over[k];}return base;}
+let S=hydrate(clone(DEFAULTS),loadJSON('loop.v1'));
+const TWEAK_DEFAULTS=/*EDITMODE-BEGIN*/{wireframe:false,accent:'teal',compact:false,forced:false}/*EDITMODE-END*/;
+let TW=hydrate(clone(TWEAK_DEFAULTS),loadJSON('loop.tweaks'));
+const save=()=>{try{localStorage.setItem('loop.v1',JSON.stringify(S))}catch(e){}};
+const saveT=()=>{try{localStorage.setItem('loop.tweaks',JSON.stringify(TW))}catch(e){}};
+
+const navItems=[
+  ['today','Today','i-sun'],['opportunities','Opportunities','i-radar'],['approvals','Approvals','i-stamp'],
+  ['review','Action review','i-mail'],['activity','Activity','i-pulse'],['learning','Learning','i-loopa'],
+  ['relationships','Relationships','i-nodes'],['settings','Settings','i-slid']];
+const titles={today:['Today','Operator home'],opportunities:['Opportunities','Working queue'],
+  approvals:['Approvals','Waiting on you'],review:['Action review','ACT-2214 \u00b7 Acme Analytics'],
+  activity:['Activity','Operational ledger'],learning:['Learning','Behavior changes'],
+  relationships:['Relationships','Warm paths'],settings:['Settings','Autonomy & safety']};
+
+const pendingCount=()=>1+(S.dec.status==='pending'?0:0)+(S.dec.introQueued?1:0);
+const modeChip=()=>S.mode==='autopilot'?['auto','Autopilot']:['','Propose'];
+function statusPill(st){return {PROPOSED:['warn','Action ready'],QUALIFIED:['plain','Researching'],PLANNED:['plain','Draft ready'],
+  SENT:['info','Sent'],REPLIED:['ok','Replied \u2014 hot'],ONHOLD:['plain','On hold'],RISK:['risk','Blocked'],REWORK:['warn','Reworking']}[st]||['plain',st];}
+function oppRow(o,demoChanged){
+  const c=DB.companies[o.co],ct=o.ct?DB.contacts[o.ct]:{name:'—',role:''};
+  const hot=o.co==='acme'&&(S.dec.status==='approved'&&S.demo.outcome&&S.demo.policy===15);
+  const st=hot?statusPill('REPLIED'):statusPill(o.status);
+  return `<div class="opp-row ${hot?'hot':''}" data-a="opp" data-id="${o.id}" role="button" tabindex="0" aria-label="${c.name} opportunity">
+    <div class="co-ava" style="background:${c.color}">${c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+    <div style="min-width:0"><div class="co">${c.name}</div><div class="ct">${ct.name}${ct.role?' \u00b7 '+ct.role:''}</div></div>
+    <div><span class="sig ${o.sig.type}">${o.sig.label}</span><div class="mono-cell" style="margin-top:3px">${o.sig.age} ago \u00b7 strength ${o.sig.strength}</div></div>
+    <div class="str"><div class="meter" style="width:100%"><i style="width:${o.icp}%"></i></div><span class="mono-cell"><b>${o.icp}</b></span></div>
+    <div><span class="warmth w${o.warm}" title="warmth"><i></i><i></i><i></i></span></div>
+    <div class="mono-cell">${hot?'<b>Reply now</b><br>policy v15':esc(hot?o.action:o.action)}</div>
+    <span class="pill ${st[0]}"><span class="dot"></span>${st[1]}</span>
+    <div class="score">${o.nextBest}<small>NEXT-BEST</small></div></div>`;}
+
+/* ============================== SHELL ============================== */
+function renderNav(){
+  const pc=S.dec.status==='pending'?1:0, ic=S.dec.introQueued?1:0;
+  $('#nav').innerHTML=`<div class="nav-label">Operate</div>`+
+    navItems.filter(n=>['today','opportunities','approvals','activity'].includes(n[0])).map(n=>
+      `<button class="nav-item" data-a="nav" data-r="${n[0]}" ${S.route===n[0]?'aria-current="page"':''}>${icon(n[2])}${n[1]}
+       ${n[0]==='approvals'&&pc+ic?`<span class="count">${pc+ic}</span>`:''}</button>`).join('')+
+    `<div class="nav-label">Improve</div>`+
+    navItems.filter(n=>['learning','relationships'].includes(n[0])).map(n=>
+      `<button class="nav-item" data-a="nav" data-r="${n[0]}" ${S.route===n[0]?'aria-current="page"':''}>${icon(n[2])}${n[1]}
+       ${n[0]==='learning'&&S.demo.outcome?'<span class="count learn">v15</span>':''}</button>`).join('')+
+    `<div class="nav-label">Control</div>`+
+    navItems.filter(n=>['settings','review'].includes(n[0])).map(n=>
+      `<button class="nav-item" data-a="nav" data-r="${n[0]}" ${S.route===n[0]?'aria-current="page"':''}>${icon(n[2])}${n[1]}</button>`).join('');
+  const bn=[['today','Today','i-sun'],['opportunities','Opps','i-radar'],['approvals','Approve','i-stamp'],['activity','Trail','i-pulse']];
+  $('#bottomNav').innerHTML=bn.map(n=>`<button data-a="nav" data-r="${n[0]}" ${S.route===n[0]?'aria-current="page"':''}>${icon(n[2])}${n[1]}${n[0]==='approvals'&&pc+ic?`<span class="count">${pc+ic}</span>`:''}</button>`).join('')+
+    `<button data-a="more"><svg class="ic"><use href="#i-slid"/></svg>More</button>`;
+}
+function renderStatus(){
+  const [cls,lbl]=modeChip(), used=22;
+  $('#statusCard').innerHTML=`
+    <div class="status-head"><span class="mode-chip ${cls}">${lbl}</span>
+      <span class="hb ${S.paused?'paused':''}" style="margin-left:auto">${S.paused?'paused':'heartbeat'} \u00b7 <span class="hb-time">${S.paused?'held':S.hb+'s'}</span></span></div>
+    <div class="kv"><span>Daily action budget</span><b>${used} / 40</b></div>
+    <div class="meter"><i style="width:${used/40*100}%"></i></div>
+    <div class="kv"><span>Guardrails today</span><b>5/5 pass</b></div>
+    <div class="kv"><span>Policy</span><b>v${S.demo.policy}</b></div>
+    <span class="guard-chip">${icon('i-check')} Safe to run \u00b7 simulation mode</span>`;
+}
+function renderTopbar(){
+  const t=titles[S.route]||titles.today;
+  const crumb=S.route==='review'?'<span class="crumb"><b>Approvals</b> / ACT-2214</span>':'';
+  $('#topbar').innerHTML=`${crumb}<h1 class="page-title">${t[0]}</h1><span class="faint small">${t[1]}</span>
+    <span class="topbar-spacer"></span>
+    <div class="seg" role="group" aria-label="Operating mode">
+      <button data-a="mode" data-v="propose" aria-pressed="${S.mode==='propose'}">Propose</button>
+      <button data-a="mode" data-v="autopilot" aria-pressed="${S.mode==='autopilot'}">Autopilot</button></div>
+    <button class="icon-btn ${S.paused?'danger-live':''}" data-a="pause" aria-label="${S.paused?'Resume agent':'Pause agent'}">${icon(S.paused?'i-play':'i-pause')}</button>
+    <span class="hb ${S.paused?'paused':''}"><span class="hb-dot"></span><span class="hb-time">${S.paused?'held':S.hb+'s'}</span></span>
+    <div class="avatar" title="${DB.operator}">JR</div>`;
+}
+function safeShell(name,fn){try{fn()}catch(e){console.error(name,e);}}
+function render(){safeShell('nav',renderNav);safeShell('status',renderStatus);safeShell('topbar',renderTopbar);
+  const v=$('#view');if(!v)return;let html='';
+  try{html=(SCREENS[S.route]||SCREENS.today)();}
+  catch(e){console.error('screen '+S.route,e);
+    html=`<div class="panel pad" style="border-color:var(--coral);margin:20px 0"><b>This screen hit an error (${esc(S.route)})</b><pre class="code" style="white-space:pre-wrap;margin-top:8px">${esc((e&&e.stack)||String(e))}</pre><p class="small muted" style="margin-top:8px">Everything else keeps working — this card is the error report.</p></div>`;}
+  v.innerHTML=`<div class="view-inner">${html}</div>`;
+  v.scrollTop=0;}
+
+/* ============================== TODAY ============================== */
+function scrToday(){
+  const decided=S.dec.status!=='pending'&&S.dec.status!=='rejected', outcome=S.demo.outcome, rejected=S.dec.status==='rejected';
+  const brief=rejected?`You rejected the Acme draft as <b>\u201c${S.dec.reject||'other'}\u201d</b> \u2014 recorded as structured feedback, not a dead end. I\u2019m redrafting with the reason applied; the new draft lands in Approvals. Acme stays qualified: the signal is still fresh and Marcus\u2019s path is still warm.`
+    : decided
+    ? (outcome?`<b>Outcome landed.</b> Ava replied to your approved email within the hour \u2014 positive. Policy v15 moved replies on warm threads to the front of the queue, and Acme\u2019s next action changed accordingly. Nothing else needs you.`
+        :`<b>You approved the Acme intro email.</b> It\u2019s scheduled for tomorrow 9:12 AM and running in simulation \u2014 no real sends. I\u2019ll surface the outcome here the moment it lands.`)
+    :`Good morning, Jordan. Overnight I screened <b>214 companies</b> and found <b>3 worth your time</b>. The standout: <b>Acme Analytics raised a $32M Series B</b> two days ago, and <b>Ava Chen</b> \u2014 your warmest way in, via Marcus Reed \u2014 just took over as VP Growth. <b>I\u2019ve drafted the intro email.</b> It needs your approval before anything sends. Everything else is quiet: no guardrail blocks, 18 of today\u2019s 40-action budget left.`;
+  const decisionPanel=rejected
+    ? `<div class="panel pad" data-wf="NEEDS DECISION \u2014 resolved">
+        <div class="delta"><div class="delta-ic" style="background:var(--coral-soft);color:var(--coral-ink)">${icon('i-x')}</div>
+        <div><b>Acme draft rejected \u2014 \u201c${S.dec.reject||'other'}\u201d</b>
+        <div class="sub">${S.dec.note?esc(S.dec.note)+' \u00b7 ':''}The reason now trains drafting and targeting \u2014 see how in Learning.</div>
+        <div class="sub" style="margin-top:6px"><a href="#" data-a="nav" data-r="learning">How the feedback is used \u2192</a> \u00b7 <a href="#" data-a="newdraft-inline">Request a new draft</a></div></div></div></div>`
+    : decided
+    ? `<div class="panel pad" data-wf="NEEDS DECISION \u2014 resolved">
+        <div class="delta"><div class="delta-ic">${icon(outcome?'i-check':'i-clock')}</div>
+        <div><b>${outcome?'Ava Chen replied \u2014 positive':'Acme intro email scheduled'}</b>
+        <div class="sub">${outcome?'\u201cThis is timely \u2014 can you walk Marcus\u2019s team through it?\u201d \u00b7 learning applied, policy v15':'Tomorrow (Wed) 9:12 AM \u00b7 simulation \u00b7 guardrails passed 5/5'}</div>
+        <div class="sub" style="margin-top:6px"><a href="#" data-a="nav" data-r="learning">See what changed because of this \u2192</a></div></div></div></div>`
+    : `<div class="panel decision-hero" data-wf="NEEDS YOUR DECISION (hero)">
+        <div><span class="pill warn"><span class="dot"></span>Waiting 4h \u00b7 expires in 20h</span>
+          <h3 class="serif" style="font-size:17.5px;margin-top:8px">Warm intro: congratulate the raise, offer the CAC teardown</h3>
+          <div class="sub">Acme Analytics \u00b7 Ava Chen, VP Growth \u00b7 email via Marcus Reed\u2019s path \u00b7 expected reply 14.6%</div></div>
+        <div class="dec-cta"><button class="btn btn-primary" data-a="review">Review action ${icon('i-chev')}</button>
+          <span class="wait-note">approval takes ~30 seconds</span></div></div>`;
+  const nba=[DB.opps[1],DB.opps[2],DB.opps[3]].map(o=>{
+    const c=DB.companies[o.co],ct=DB.contacts[o.ct];
+    return `<div class="nba-row" data-a="opp" data-id="${o.id}" role="button" tabindex="0">
+      <span class="score">${o.nextBest}<small>NEXT-BEST</small></span>
+      <div><b style="font-size:13.5px">${c.name}</b> <span class="faint">\u00b7</span> <span class="muted small">${ct.name} \u00b7 ${o.action}</span>
+        <div class="mono-cell" style="margin-top:2px;color:var(--faint)">${o.why}</div></div>
+      <span class="sig ${o.sig.type}">${o.sig.label}</span><span class="pill plain">${o.sig.age} old</span></div>`;}).join('');
+  const deltas=outcome?
+    [{ic:'i-up',b:'Replies now jump the queue',s:'Policy v15 \u00b7 triggered by Ava\u2019s positive reply \u00b7 warm-thread replies answered inside 2h'},
+     {ic:'i-up',b:'Warm paths get first pick',s:'Variant B share rose 51% \u2192 58% after the third straight warm-path win'}]:
+    [{ic:'i-up',b:'Emails got shorter',s:'After 3 \u201ctoo long\u201d rejections, openers dropped 132 \u2192 68 words \u00b7 early replies +3.1 pts (policy v14)'},
+     {ic:'i-up',b:'Mid-week mornings win',s:'Tue\u2013Thu 9\u201311 AM now out-replies Monday 1.8\u00d7 \u00b7 timing shifted automatically'}];
+  const fun=[['Screened',214],['Qualified',48],['Proposed',31],['Sent',22],['Replied',6],['Meetings',2]];
+  const max=Math.sqrt(214);
+  const funnel=`<div class="funnel" data-wf="COMPACT FUNNEL">${fun.map(f=>`<div class="step">
+      <div class="num">${f[1]}</div><div class="bar" style="height:${Math.max(4,Math.sqrt(f[1])/max*56)}px"></div><div class="lbl">${f[0]}</div></div>`).join('')}
+      <div class="step" style="flex:0 0 90px;margin-left:14px;border-left:1px solid var(--line);padding-left:14px">
+      <div class="num" style="color:var(--teal-strong)">\$184k</div><div class="bar" style="height:0"></div><div class="lbl">sim. ARR</div></div></div>`;
+  const tl=DB.activity.slice(0,5).map(ev=>`<li class="${ev.status}">
+    <span class="t">${ev.t} \u00b7 ${ev.who} \u00b7 v${ev.pol}</span>
+    <div class="e"><b>${ev.co?DB.companies[ev.co].name+': ':''}${esc(ev.event)}</b></div>
+    ${ev.outcome?`<div class="o">${esc(ev.outcome)}</div>`:''}</li>`).join('');
+  return `
+  <section class="panel brief" data-wf="AGENT BRIEF (serif voice)">
+    <div class="kicker">${icon('i-loopa')} Agent brief \u00b7 Thu Mar 12 \u00b7 214 companies screened overnight</div>
+    <p>${brief}</p>
+    <div class="stamp"><span>mode: ${S.mode==='autopilot'?'autopilot \u00b7 scoped':'propose'}</span><span>heartbeat: live</span><span>guardrails: 5/5 today</span><span>policy v${S.demo.policy}</span></div>
+  </section>
+  <div class="sec-h" style="margin-top:20px"><h2>Needs your decision</h2><span class="link"><a href="#" data-a="nav" data-r="approvals">All approvals \u2192</a></span></div>
+  ${decisionPanel}
+  <div class="split c21" style="margin-top:4px">
+    <div>
+      <div class="sec-h"><h2>Next best actions</h2><span class="link"><a href="#" data-a="nav" data-r="opportunities">Full queue \u2192</a></span></div>
+      <div class="panel" data-wf="NEXT BEST ACTIONS">${nba}</div>
+      <div class="sec-h"><h2>Learning since yesterday</h2><span class="link"><a href="#" data-a="nav" data-r="learning">Why it changed \u2192</a></span></div>
+      <div class="panel" data-wf="LEARNING DELTAS">${deltas.map(d=>`<div class="delta"><div class="delta-ic">${icon(d.ic)}</div><div><b>${d.b}</b><div class="sub">${d.s}</div></div></div>`).join('')}</div>
+    </div>
+    <div>
+      <div class="sec-h"><h2>The loop today</h2></div>
+      <div class="panel pad" data-wf="FUNNEL + TIMELINE">${funnel}
+        <ul class="tl" style="margin-top:18px">${tl}</ul></div>
+    </div>
+  </div>`;
+}
+
+/* ========================= OPPORTUNITIES ========================= */
+function oppListFiltered(){
+  let l=DB.opps.slice();
+  if(S.opp.sig!=='all')l=l.filter(o=>o.sig.type===S.opp.sig);
+  if(S.opp.q){const q=S.opp.q.toLowerCase();l=l.filter(o=>(DB.companies[o.co].name+' '+(o.ct?DB.contacts[o.ct].name:'')+' '+o.sig.label).toLowerCase().includes(q));}
+  if(S.opp.sort==='score')l.sort((a,b)=>b.nextBest-a.nextBest);
+  if(S.opp.sort==='recency')l.sort((a,b)=>parseInt(a.sig.age)-parseInt(b.sig.age));
+  if(S.opp.sort==='value')l.sort((a,b)=>(b.icp*b.sig.strength)-(a.icp*a.sig.strength));
+  return l;}
+function scrOpps(){
+  if(S.opp.sel)return scrOppDetail(S.opp.sel);
+  const rows=oppListFiltered();
+  const sigs=[['all','All signals'],['funding','Funding'],['hiring','Hiring'],['product','Product'],['content','Content'],['pricing','Pricing']];
+  return `
+  <div class="toolbar" data-wf="QUEUE TOOLBAR">
+    <div class="search">${icon('i-search')}<input data-f="q" value="${esc(S.opp.q)}" placeholder="Search company, contact, signal\u2026" aria-label="Search opportunities"></div>
+    <select class="sel" data-f="sort" aria-label="Sort">
+      <option value="score"${S.opp.sort==='score'?' selected':''}>Sort: next-best score</option>
+      <option value="recency"${S.opp.sort==='recency'?' selected':''}>Sort: signal recency</option>
+      <option value="value"${S.opp.sort==='value'?' selected':''}>Sort: expected value</option></select>
+    ${sigs.map(s=>`<button class="chip" data-a="sigfilter" data-v="${s[0]}" aria-pressed="${S.opp.sig===s[0]}">${s[1]}</button>`).join('')}
+  </div>
+  <div class="panel" data-wf="OPPORTUNITY QUEUE (rows)">
+    <div class="opp-head"><span></span><span>Company \u00b7 contact</span><span>Signal</span><span>ICP</span><span>Warmth</span><span>Next action</span><span>Status</span><span style="text-align:right">Score</span></div>
+    ${rows.length?rows.map(o=>oppRow(o)).join(''):`<div class="empty">No opportunities match \u2014 clear the search or filters.</div>`}
+  </div>
+  <p class="faint small" style="margin-top:10px">7 open \u00b7 3 action-ready \u00b7 bulk select arrives when it\u2019s safe (<span class="mono">disabled by design</span>)</p>`;}
+function scrOppDetail(id){
+  const o=DB.opps.find(x=>x.id===id)||DB.opps[0];
+  const c=DB.companies[o.co],ct=o.ct?DB.contacts[o.ct]:null;
+  const ev=o.co==='acme'?[['Mar 10','Series B announced \u2014 $32M led by Ridgeline'],['Mar 11','Ava Chen promoted to VP Growth'],['Mar 11','Job posts: +4 growth roles'],['Mar 12','Marcus Reed path identified \u00b7 strength 0.86']]
+    :[['Mar 9','Signal first observed'],['Mar 10','ICP model scored '+o.icp],['Mar 11','Queued for research'],['Mar 12','Holding \u2014 '+o.statusLabel.toLowerCase()]];
+  return `
+  <button class="btn btn-ghost btn-sm" data-a="back">${icon('i-back')} All opportunities</button>
+  <div style="display:flex;align-items:center;gap:12px;margin:14px 0 18px">
+    <div class="co-ava" style="width:44px;height:44px;font-size:16px;background:${c.color}">${c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+    <div><h2 class="serif" style="font-size:21px">${c.name}</h2><div class="muted small">${o.id} \u00b7 opened ${o.sig.age} ago</div></div>
+    <span style="flex:1"></span>
+    ${o.co==='acme'&&S.dec.status==='pending'?`<button class="btn btn-primary" data-a="review">Review proposed action</button>`:''}
+  </div>
+  <div class="opp-detail" data-wf="OPPORTUNITY DETAIL (3-col workspace)">
+    <div class="col">
+      <div class="panel pad"><h4 class="mono faint" style="margin-bottom:9px">COMPANY</h4>
+        <dl class="dl"><dt>Segment</dt><dd>${c.seg}</dd><dt>Size</dt><dd>${c.size}</dd><dt>ARR band</dt><dd>${c.arr}</dd>
+        <dt>Location</dt><dd>${c.loc}</dd><dt>ICP fit</dt><dd><b>${c.icp} / 100</b> \u00b7 model v6</dd></dl></div>
+      ${ct?`<div class="panel pad"><h4 class="mono faint" style="margin-bottom:9px">CONTACT</h4>
+        <div class="ident"><div class="ct-ava" style="background:var(--teal-soft);color:var(--teal-ink)">${ct.name.split(' ').map(w=>w[0]).join('')}</div>
+        <div><div class="nm">${ct.name}</div><div class="rl">${ct.role} \u00b7 ${c.name}</div></div></div>
+        <dl class="dl" style="margin-top:10px"><dt>Email</dt><dd class="mono" style="font-size:11px">${ct.email}</dd><dt>Note</dt><dd>${ct.note}</dd></dl></div>`:''}
+      <div class="panel pad"><h4 class="mono faint" style="margin-bottom:9px">SIGNAL TIMELINE</h4>
+        <ul class="tl">${ev.map((e,i)=>`<li class="${i===0?'info':''}"><span class="t">${e[0]}</span><div class="e">${e[1]}</div></li>`).join('')}</ul></div>
+    </div>
+    <div class="col">
+      <div class="panel pad"><h4 class="mono faint" style="margin-bottom:9px">WHY IT QUALIFIED</h4>
+        <div class="why-rank">${DB.act.ev.map(e=>`<div class="it"><span></span><div><b style="font-size:12.5px">${e[0]}</b><div class="sub">${e[1]}</div></div></div>`).join('')}</div></div>
+      <div class="panel pad"><h4 class="mono faint" style="margin-bottom:9px">RELATIONSHIP PATH</h4>
+        <div>${o.co==='acme'?'<span class="pathchip"><b>You</b></span><span class="pathchip arr">\u2192</span><span class="pathchip"><b>Marcus Reed</b> \u00b7 0.86</span><span class="pathchip arr">\u2192</span><span class="pathchip"><b>Ava Chen</b></span>':'<span class="faint small">No strong path yet \u2014 direct approach or build one via Relationships.</span>'}</div>
+        ${o.co==='acme'?`<div class="sub muted small" style="margin-top:8px">Marcus worked with Ava at Northbeam for 2 years. His 3 intros all got replies.</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" data-a="nav" data-r="relationships">Open graph ${icon('i-chev')}</button>`:''}</div>
+      <div class="panel pad"><h4 class="mono faint" style="margin-bottom:9px">PREVIOUS ACTIONS</h4>
+        <div class="faint small">None \u2014 first touch. Last contact with ${c.name} was 214 days ago (different thread).</div></div>
+    </div>
+    <div class="col">
+      <div class="panel pad" style="border-color:var(--teal);background:var(--teal-soft)">
+        <h4 class="mono faint" style="margin-bottom:9px">CURRENT RECOMMENDATION</h4>
+        <div class="serif" style="font-size:15.5px;line-height:1.4">${o.co==='acme'?'Warm intro email \u2014 congratulate the raise, offer the CAC teardown':esc(o.action)!=='—'?esc(o.action):'No action yet \u2014 researching'}</div>
+        ${o.co==='acme'?`<dl class="dl" style="margin-top:10px"><dt>Channel</dt><dd>Email \u00b7 via Marcus\u2019s intro</dd><dt>Timing</dt><dd>Tomorrow 9:12 AM</dd><dt>Variant</dt><dd class="mono" style="font-size:11px">B \u00b7 warm + short \u00b7 78% conf.</dd></dl>
+        ${S.dec.status==='pending'?`<button class="btn btn-primary" style="margin-top:12px;width:100%" data-a="review">Open in action review</button>`:`<span class="pill ${S.demo.outcome?'ok':'info'}" style="margin-top:12px"><span class="dot"></span>${S.demo.outcome?'Replied \u2014 hot':'Scheduled (simulation)'}</span>`}`:''}
+      </div>
+      <div class="panel pad"><h4 class="mono faint" style="margin-bottom:9px">WHY NOW?</h4>
+        <p class="small" style="line-height:1.6">${o.why}. ${o.co==='acme'?'Reply windows to funding news peak days 3\u20135; the raise was 2 days ago, so tomorrow lands the peak.':'Signal is still fresh enough to reference naturally.'}</p></div>
+      <div class="panel pad"><h4 class="mono faint" style="margin-bottom:9px">WHAT WOULD CHANGE THIS?</h4>
+        <div class="what-if">${DB.act.whatIf.map(w=>`<span class="chip">${esc(w)}</span>`).join('')}</div></div>
+    </div>
+  </div>`;}
+
+/* ========================= APPROVALS (queue) ========================= */
+function scrApprovals(){
+  const pending=S.dec.status==='pending';
+  const items=[];
+  if(pending)items.push({id:'ACT-2214',co:'acme',t:'Warm intro email \u00b7 via Marcus Reed',w:'Waiting 4h \u00b7 expires in 20h',open:'review'});
+  if(S.dec.introQueued)items.push({id:'ACT-2230',co:'elmoak',t:'Intro request \u00b7 ask Marcus to make the intro',w:'Queued from Relationships',open:'toast'});
+  items.push({id:'ACT-2201',co:'drift',t:'CAC case-study email \u00b7 Dana path',w:'Waiting since 9:12',open:'toast'});
+  return `
+  <div class="panel" data-wf="APPROVAL QUEUE">
+    ${items.map(it=>{const c=DB.companies[it.co];return `
+    <div class="nba-row" style="grid-template-columns:auto 1fr auto" data-a="${it.open==='review'?'review':'approvItem'}">
+      <div class="co-ava" style="background:${c.color}">${c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+      <div><b style="font-size:13.5px">${c.name}</b><div class="muted small">${it.t}</div>
+        <div class="mono-cell" style="margin-top:2px;color:var(--amber-ink)">${it.w}</div></div>
+      ${it.open==='review'?`<button class="btn btn-primary btn-sm">Review ${icon('i-chev')}</button>`:`<span class="pill plain">queued</span>`}</div>`;}).join('')}
+  </div>
+  <div class="split c2" style="margin-top:16px">
+    <div class="panel pad"><h4 class="mono faint" style="margin-bottom:8px">AUTOPILOT LOG \u00b7 TODAY</h4>
+      <ul class="tl"><li class="ok"><span class="t">09:41 \u00b7 Loop</span><div class="e">Cobalt Health \u2014 ops checklist sent automatically</div><div class="o">Inside autopilot scope \u00b7 budget 22/40</div></li>
+      <li class="warn"><span class="t">09:12 \u00b7 Loop</span><div class="e">Driftwood case study held for you</div><div class="o">Outside scope: first touch to a new segment</div></li></ul></div>
+    <div class="panel pad"><h4 class="mono faint" style="margin-bottom:8px">WHAT AUTOPILOT MAY DO</h4>
+      <p class="small" style="line-height:1.6">${autoPreviewText()}</p>
+      <button class="btn btn-ghost btn-sm" style="margin-top:10px" data-a="nav" data-r="settings">Adjust boundaries ${icon('i-chev')}</button></div>
+  </div>`;}
+
+/* ==================== ACTION REVIEW (3-pane workspace) ==================== */
+function autoPreviewText(){
+  const ch=[S.set.chEmail&&'email',S.set.chLi&&'LinkedIn'].filter(Boolean).join(' and ')||'no channels';
+  const segs=[S.set.segSaas&&'SaaS',S.set.segAgency&&'agency',S.set.segLogi&&'logistics'].filter(Boolean).join(', ')||'no segments';
+  const n=Math.max(2,Math.round(S.set.budget/3));
+  return `With these settings, Loop may automatically execute up to <b>${n} actions/day</b> across <b>${ch}</b> for <b>${segs}</b> accounts (\u2248 ${n} of your ${S.set.budget}-action daily budget). Intro requests, external actions, and budget exceptions still need your approval.`;}
+function scrReview(){
+  const d=S.dec, a=DB.act;
+  const cur=d.body||a.body, curSub=d.sub||a.subject;
+  const edited=d.edited;
+  if(d.status==='approved'){
+    return `<div class="review">
+      <div class="rail"></div>
+      <div class="editor">
+        <div class="panel done-panel" data-wf="CONFIRMATION STATE">
+          <div class="ring">${icon('i-check')}</div>
+          <h3>Approved${edited?' \u2014 with your edits':''}${d.note?' and your note':''}</h3>
+          <p class="sub">\u201c${esc(curSub)}\u201d goes out <b>tomorrow 9:12 AM</b> in simulation. I\u2019m watching the thread \u2014 the outcome and what it teaches land in <a href="#" data-a="nav" data-r="learning">Learning</a>.</p>
+        </div>
+        <div class="panel pad confirm-sheet" data-wf="WHAT HAPPENS NEXT">
+          <div class="head">${icon('i-info')} What happens next</div>
+          <ul class="confirm-list">
+            <li><span class="k">Schedule</span><span>Queued for Wed Mar 13, 9:12 AM (her local time). Cancel or edit any time before send.</span></li>
+            <li><span class="k">Guardrails</span><span>5/5 re-checked at send time \u2014 frequency, budget, claims, reputation, data source.</span></li>
+            <li><span class="k">Learning</span><span>Recorded: ${edited?'approval with edits \u2192 \u201cedits improve outcomes\u201d signal on Variant B':'approval on warm path \u2192 reinforces Variant B on warm paths'}. ${d.note?'Your note is attached to the audit trail.':''}</span></li>
+            <li><span class="k">Watch</span><span>Reply window days 1\u20135. If Ava replies, fast-reply policy (v15) jumps her to the front.</span></li>
+          </ul>
+        </div>
+        <div style="display:flex;gap:10px"><button class="btn btn-ghost" data-a="nav" data-r="activity">See it in the activity trail</button>
+        <button class="btn btn-ghost" data-a="nav" data-r="today">Back to Today</button></div>
+      </div><div class="rail"></div></div>`;}
+  if(d.status==='rejected'){
+    return `<div class="review"><div class="rail"></div>
+      <div class="editor"><div class="panel done-panel" data-wf="REJECTED STATE">
+        <div class="ring" style="background:var(--coral-soft);color:var(--coral-ink)">${icon('i-x')}</div>
+        <h3>Rejected \u2014 \u201c${d.reject||'other'}\u201d</h3>
+        <p class="sub">${d.note?esc(d.note)+' \u00b7 ':''}Recorded as structured feedback. Acme stays qualified; I\u2019m redrafting with the reason applied. Policy changes (if any) appear in Learning.</p>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+          <button class="btn btn-ghost" data-a="newdraft">Request a new draft</button>
+          <button class="btn btn-primary" data-a="nav" data-r="learning">See how feedback is used ${icon('i-chev')}</button></div>
+      </div></div><div class="rail"></div></div>`;}
+  /* pending / confirming */
+  const confirming=d.status==='confirming';
+  const leftRail=`<div class="rail" data-wf="CONTEXT RAIL">
+    <div class="panel"><h4>TARGET</h4>
+      <div class="ident"><div class="ct-ava" style="background:var(--teal-soft);color:var(--teal-ink)">AC</div>
+      <div><div class="nm">Ava Chen</div><div class="rl">VP Growth \u00b7 Acme Analytics</div></div></div>
+      <div style="margin-top:9px"><span class="warmth w3"><i></i><i></i><i></i><span>warm \u00b7 via Marcus</span></span></div>
+      <div class="mono" style="margin-top:8px;color:var(--faint)">ava.chen@acmeanalytics.co</div></div>
+    <div class="panel"><h4>SIGNAL</h4>
+      <div><span class="sig funding">Series B \u00b7 $32M</span></div>
+      <dl class="dl" style="margin-top:8px"><dt>Age</dt><dd>2 days</dd><dt>Strength</dt><dd><b>86</b> / 100</dd><dt>Source</dt><dd class="small">Ridgeline press + coverage</dd></dl></div>
+    <div class="panel"><h4>GUARDRAILS \u00b7 5/5 PASS</h4>
+      ${a.guardrails.map(g=>`<div class="gr">${icon('i-check')}<div>${g[0]}<div class="d">${g[1]}</div></div></div>`).join('')}</div>
+    <div class="panel"><h4>RUNTIME</h4>
+      <dl class="dl"><dt>Policy</dt><dd class="mono">v${S.demo.policy} \u00b7 Mar 11</dd><dt>Variant</dt><dd class="mono">B \u00b7 warm + short</dd><dt>Confidence</dt><dd><b>78%</b> Thompson</dd><dt>Budget</dt><dd>18 of 40 left</dd></dl></div>
+  </div>`;
+  const altDraft=a.altBody;
+  const center=`<div class="editor" data-wf="ACTION EDITOR (center)">
+    <div class="panel">
+      <div class="ed-meta">
+        <span class="pill info">${icon('i-mail')} Email \u00b7 via Marcus\u2019s intro</span>
+        <span class="mono-chip">${icon('i-clock')} ${a.timing}</span>
+        <span class="mono-chip">OUTREACH_EMAIL</span>
+        <span class="edited-badge ${edited?'on':''}">${icon('i-check')} Edited by you \u00b7 changes tracked</span>
+        <span style="flex:1"></span>
+        <button class="btn btn-ghost btn-sm" data-a="newdraft">${d.regen?'Regenerate again':'Request new draft'}</button>
+      </div>
+      <div class="field"><label>Subject <span class="hint">${edited&&curSub!==a.subject?'changed \u00b7 original kept in audit':'agent-drafted \u00b7 editable'}</span></label>
+        <input class="subject" data-f="sub" value="${esc(curSub)}" ${confirming?'disabled':''}></div>
+      <div class="field"><label>Message <span class="hint">agent-drafted \u00b7 editable${altDraft&&d.regen?' \u00b7 draft #2':''}</span></label>
+        <textarea class="body" data-f="body" ${confirming?'disabled':''}>${esc(d.body||a.body)}</textarea></div>
+      <div class="ed-meta" style="margin-top:12px">
+        <span class="small muted">Expected effect \u00b7</span>
+        ${a.expect.map(e=>`<span class="mono-chip">${e[0]} <b style="color:var(--ink)">${e[1]}</b></span>`).join('')}
+      </div>
+    </div>
+    ${confirming?`
+    <div class="panel confirm-sheet" data-wf="APPROVE CONFIRM SHEET">
+      <div class="head">${icon('i-flag')} Approve this send \u2014 deliberate, not default</div>
+      <ul class="confirm-list">
+        <li><span class="k">Action</span><span>Send <b>\u201c${esc(curSub)}\u201d</b> to Ava Chen (Acme Analytics) \u00b7 tomorrow 9:12 AM \u00b7 simulation.</span></li>
+        <li><span class="k">Your edits</span><span>${edited?'Yes \u2014 subject/body edited; originals kept in the audit trail.':'None \u2014 sending as drafted.'}</span></li>
+        <li><span class="k">Note</span><span>${d.note?esc(d.note):'<span class="faint">none</span>'} <button class="btn btn-ghost btn-sm" data-a="editNote" style="margin-left:6px">edit note</button></span></li>
+        <li><span class="k">Guardrails</span><span>5/5 passed \u00b7 re-checked at send time.</span></li>
+        <li><span class="k">Learning</span><span>${edited?'Approval-with-edits strengthens \u201cedits help\u201d signal on Variant B.':'Approval strengthens Variant B on warm paths.'}</span></li>
+      </ul>
+      <div style="display:flex;gap:10px;padding:0 16px 16px">
+        <button class="btn btn-primary" data-a="approve2">${icon('i-check')} Confirm approval</button>
+        <button class="btn btn-ghost" data-a="back2edit">Back to editor</button></div>
+    </div>`:`
+    <div class="approve-bar" data-wf="APPROVAL FOOTER">
+      <button class="btn btn-primary" data-a="approve1">${icon('i-check')} Approve</button>
+      <div class="note-input">${icon('i-flag')}<input data-f="note" value="${esc(d.note)}" placeholder="Optional note \u2014 why you approved, or what to watch" aria-label="Approval note"></div>
+      <select class="sel" data-f="reject" aria-label="Rejection reason" style="height:38px">
+        <option value="">Reject because\u2026</option>
+        <option>Too long</option><option>Too salesy</option><option>Missing personalization</option>
+        <option>Wrong target</option><option>Wrong channel</option><option>Bad timing</option>
+        <option>Not relevant now</option><option>Other</option></select>
+      <button class="btn btn-danger" data-a="reject">Reject</button>
+    </div>
+    <p class="faint small">Rejecting with a reason is how the agent learns \u2014 the reason feeds policy, not a trash can. <a href="#" data-a="pause">Pause agent</a> any time.</p>`}
+  </div>`;
+  const rightRail=`<div class="rail" data-wf="REASONING RAIL">
+    <div class="panel"><h4>WHY THIS ACTION</h4>
+      <div class="why-rank">${a.why.map(w=>`<div class="it"><span></span><div>${w[0]}<div class="sub mono">${w[1]}</div></div></div>`).join('')}</div></div>
+    <div class="panel"><h4>ALTERNATIVES CONSIDERED</h4>
+      ${a.alts.map(al=>`<div class="alt"><span>${al[0]}</span><span class="sc">${al[1]}</span><div class="meter"><i style="width:${al[1]}%"></i></div></div>`).join('')}</div>
+    <div class="panel"><h4>WHAT WOULD CHANGE THIS</h4>
+      <div class="what-if">${a.whatIf.map(w=>`<span class="chip">${esc(w)}</span>`).join('')}</div></div>
+    <div class="panel"><h4>AUDIT</h4>
+      <button class="btn btn-ghost btn-sm" data-a="trace" data-id="ACT-2214" style="width:100%">${icon('i-loopa')} Open action trace</button>
+      <div class="mono faint" style="margin-top:8px">9 stages \u00b7 signal \u2192 learning \u00b7 full reconstruction</div></div>
+  </div>`;
+  return `<div class="review">${leftRail}${center}${rightRail}</div>`;}
+
+/* ===================== ACTIVITY + TRACE OVERLAY ===================== */
+function scrActivity(){
+  const rows=DB.activity.filter(ev=>S.actFilter==='all'||ev.status===S.actFilter||(S.actFilter==='guardrail'&&ev.status==='risk'));
+  return `
+  <div class="toolbar" data-wf="LEDGER FILTERS">
+    ${[['all','All events'],['ok','Outcomes'],['warn','Awaiting you'],['risk','Guardrail blocks'],['info','Policy & feedback']].map(f=>
+      `<button class="chip" data-a="actfilter" data-v="${f[0]}" aria-pressed="${S.actFilter===f[0]}">${f[1]}</button>`).join('')}
+    <span style="flex:1"></span><span class="mono faint">audit export \u00b7 CSV</span></div>
+  <div class="ledger" data-wf="OPERATIONAL LEDGER (timeline)">
+    ${rows.length?rows.map(ev=>{const c=ev.co?DB.companies[ev.co]:null;return `
+    <div class="ev" data-id="${ev.id}">
+      <div class="ev-h" data-a="expand" role="button" tabindex="0" aria-expanded="false">
+        <span class="time">${ev.t}</span>
+        <span class="actor ${ev.actor.toLowerCase()}">${ev.who}</span>
+        <span><b style="font-size:13px">${c?c.name+' \u2014 ':''}${esc(ev.event)}</b>
+          <div class="mono-cell" style="margin-top:2px">${ev.reason}</div></span>
+        <span class="pill ${ev.status}"><span class="dot"></span>${{ok:'ok',warn:'awaiting',risk:'blocked',info:'note'}[ev.status]}</span>
+        <span class="mono-cell">v${ev.pol}</span>${icon('i-chev')}</div>
+      <div class="ev-b"><div class="trace-kv">
+        <div class="tkv"><div class="k">Outcome</div><div class="v">${esc(ev.outcome||'\u2014')}</div></div>
+        <div class="tkv"><div class="k">Policy version</div><div class="v mono">v${ev.pol}</div></div>
+        <div class="tkv"><div class="k">Reason</div><div class="v">${esc(ev.reason)}</div></div></div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" data-a="trace" data-id="ACT-2214">${icon('i-loopa')} Reconstruct this action \u2014 full trace</button>
+      </div></div>`;}).join(''):`<div class="empty">Nothing in the ledger matches this filter.</div>`}
+  </div>`;}
+/* Trace stages: Signal→Qualify→Select→Draft→Guardrails→Decision→Execute→Outcome→Learn */
+function traceStages(){
+  const d=S.dec,done=d.status==='approved';
+  const st=[
+    ['Signal','06:12 UTC','funding detected \u00b7 38 min latency','<b>Series B \u00b7 $32M</b> led by Ridgeline, via press feed + coverage cross-check. Attached to Acme Analytics within 38 minutes of publication.'],
+    ['Qualify','06:14','ICP 92 \u00b7 warm path found','ICP model v6 scored Acme 92 (B2B analytics \u00b7 84 seats \u00b7 4 growth roles). Warm graph returned <b>Marcus Reed \u2192 Ava Chen</b> (0.86 / 0.74).'],
+    ['Select','06:14','variant B \u00b7 78% confidence','Thompson sampling picked Variant B (warm + short). Its posterior leads on warm paths: 18.4% reply vs 9.8% for Variant A (CI +2 to +11).'],
+    ['Draft','06:15','68 words \u00b7 assert. 0.48','Generated under policy v14: opener \u2264 70 words, assertiveness \u2264 0.55, two company specifics. Banned-phrase check clean.'],
+    ['Guardrails','06:15','5/5 passed','Frequency (214d since last touch) \u00b7 budget (18/40) \u00b7 claims (stats match source) \u00b7 reputation (96/100) \u00b7 data source (public + opt-in).'],
+    ['Decision',done?'11:08':'now','awaiting human',done?`<b>Approved${d.edited?' with edits':''}${d.note?', note: \u201c'+esc(d.note)+'\u201d':''}.</b> Recorded as \u201cedits improve outcomes\u201d signal on Variant B.`:'In Propose mode this action waits for you. It expires from the queue after 24h and returns to research.'],
+    ['Execute',done?'11:08':'—','simulation',done?'Scheduled Wed 9:12 AM. Simulated send \u2014 reputation and deliverability modeled, nothing real leaves.':'Scheduled for tomorrow 9:12 AM local \u00b7 simulation only.'],
+    ['Outcome',S.demo.outcome?'13:02':'—',S.demo.outcome?'reply \u00b7 positive':'pending',S.demo.outcome?'Ava replied: \u201cThis is timely \u2014 can you walk Marcus\u2019s team through it?\u201d Classified positive (intent to meet).':'Reply window days 1\u20135 \u00b7 watch begins at send.'],
+    ['Learn',S.demo.outcome?'13:02':'—',S.demo.outcome?'policy v15':'pending',S.demo.outcome?'Positive reply on a warm thread \u2192 v15: replies on warm paths jump the queue, answered inside 2h. Acme\u2019s next action changed from \u201cfollow-up Thu\u201d to \u201creply now\u201d.':'Outcomes feed variant posteriors + policy review. Nothing changes silently \u2014 every change lands in Learning.']];
+  return st;}
+let traceSel=0;
+function openTrace(id){
+  const st=traceStages();let i=st.findIndex(s=>s[2].includes('awaiting human')||s[2].includes('pending'));
+  traceSel=i<0?st.length-1:Math.max(0,i-1);
+  $('#overlay').innerHTML=`<div class="trace-modal" data-wf="LOOP TRACE (9 stages)" role="document">
+    <div class="trace-head"><span style="color:var(--teal-strong)">${icon('i-loopa')}</span>
+      <div><b class="serif" style="font-size:16px">Action trace \u00b7 ${id}</b><div class="mono faint">Warm intro \u2192 Acme Analytics \u00b7 policy v${S.demo.policy} \u00b7 variant B</div></div>
+      <span style="flex:1"></span><button class="icon-btn" data-a="closeTrace" aria-label="Close">${icon('i-x')}</button></div>
+    <div class="loop">${st.map((s,i)=>`<div class="st clickable ${i<=traceSel?'done':''} ${i===traceSel+1?'now':''}" data-a="traceStage" data-i="${i}" role="button" tabindex="0">
+      <div class="nd">${i+1}</div><div class="nm">${s[0]}</div><div class="dt">${s[1]}</div></div>`).join('')}</div>
+    <div class="trace-detail" id="traceDetail"></div></div>`;
+  $('#overlay').classList.add('show');renderTraceDetail();}
+function renderTraceDetail(){const st=traceStages()[traceSel];
+  $('#traceDetail').innerHTML=`<h4>Stage ${traceSel+1} \u00b7 ${st[0]} <span class="mono faint" style="font-size:11px">\u00b7 ${st[1]} \u00b7 ${st[2]}</span></h4>
+  <p class="small" style="max-width:70ch;line-height:1.65">${st[3]}</p>`;}
+
+/* ============================ LEARNING ============================ */
+function scrLearning(){
+  const pols=DB.policy.slice();if(!S.demo.outcome&&!S.demo.rolled)pols.pop();
+  const nextChanged=S.demo.outcome&&!S.demo.rolled;
+  return `
+  <div class="split c21">
+    <div>
+      <section class="panel brief" data-wf="BEHAVIOR CHANGED (hero)" style="border-left-color:var(--green)">
+        <div class="kicker" style="color:var(--green-ink)">${icon('i-up')} What the agent learned \u00b7 your feedback, applied</div>
+        <p style="font-size:17px">After three <b>\u201ctoo salesy\u201d</b> rejections, emails got shorter and warmer. Reply rate moved <b>+3.1 pts</b> in the first week \u2014 and every draft since carries the change.</p>
+      </section>
+      <div class="ba" style="margin-top:14px" data-wf="BEFORE / AFTER">
+        <div class="msg-card before"><div class="tag">Before \u00b7 policy v13</div>
+          <div class="subj">Boost your pipeline with revolutionary GTM intelligence</div>
+          <div class="body"><span class="cut">Hi Ava \u2014 I noticed Acme just raised. Our platform helps analytics companies like yours 10\u00d7 their pipeline in weeks. Industry leaders trust our revolutionary approach to pipeline generation, and I\u2019d love to show you why synergies between our platforms make this a no-brainer. Do you have 30 minutes this week for a demo? I\u2019m flexible Tuesday through Friday\u2026</span></div></div>
+        <div class="ba-arrow"><div>${icon('i-chev')}</div><div class="why">3\u00d7 \u201ctoo salesy\u201d<br>+ 1\u00d7 \u201ctoo long\u201d<br>\u2192 policy v14</div></div>
+        <div class="msg-card" style="border-color:var(--teal)"><div class="tag" style="color:var(--teal-strong)">After \u00b7 policy v14</div>
+          <div class="subj">Congrats on the raise, Ava \u2014 one idea for Q3</div>
+          <div class="body">Hi Ava \u2014 Marcus flagged the Series B, congratulations. One thought before you scale spend: a 6-minute teardown of how B2B analytics teams trimmed CAC 15\u201325% post-raise. Acme is one of the three examples. Worth a look now, or after launch week?</div>
+          <div class="pill ok" style="margin-top:10px"><span class="dot"></span>replies +3.1 pts \u00b7 first week</div></div>
+      </div>
+      <div class="panel pad" style="margin-top:14px" data-wf="PARAMETER DELTAS">
+        <div class="param"><span>Words in opener</span><div class="meter" style="max-width:220px"><i style="width:100%;background:var(--faint)"></i></div><span class="mono-val">132 \u2192 68 <span class="chg">\u2193 48%</span></span></div>
+        <div class="param"><span>Tone assertiveness</span><div class="meter" style="max-width:220px"><i style="width:70%;background:var(--faint)"></i><i style="width:48%"></i></div><span class="mono-val">0.70 \u2192 0.48 <span class="chg">\u2193 0.22</span></span></div>
+        <div class="param"><span>Personalization depth</span><div class="meter" style="max-width:220px"><i style="width:25%;background:var(--faint)"></i><i style="width:50%"></i></div><span class="mono-val">1 \u2192 2 <span class="chg">\u2191 +1</span></span></div>
+        <div class="param"><span>Banned phrases</span><div style="max-width:220px" class="small muted">added at draft-time check</div><span class="mono-val">+3 blocked</span></div>
+      </div>
+
+      ${nextChanged?`
+      <div class="sec-h"><h2>Next action changed because\u2026</h2><span class="mono faint">live \u00b7 today 13:02</span></div>
+      <div class="panel pad" style="border-color:var(--teal)" data-wf="NEXT-ACTION CHANGED EXPLAINER">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center">
+          <div><div class="mono faint">WAS \u00b7 under v14</div><b>Follow-up Thursday 9:12 AM</b><div class="small muted">standard 48h follow-up cadence</div></div>
+          <div style="color:var(--teal-strong)">${icon('i-chev')}</div>
+          <div><div class="mono faint">NOW \u00b7 under v15</div><b>Reply now \u2014 offer the walkthrough</b><div class="small muted">warm-thread replies jump the queue</div></div>
+        </div>
+        <ul style="list-style:none;margin-top:12px" class="small">
+          <li style="padding:4px 0">\u2014 Trigger: positive reply on a warm-path thread (Acme \u00b7 Ava Chen)</li>
+          <li style="padding:4px 0">\u2014 Evidence: warm-thread replies that got an answer &lt;2h converted to meetings 2.4\u00d7 more often</li>
+          <li style="padding:4px 0">\u2014 Scope: only threads where you approved the first touch</li></ul>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px" data-a="nav" data-r="opportunities">See it in the queue ${icon('i-chev')}</button>
+      </div>`:S.demo.rolled?`
+      <div class="sec-h"><h2>Next action changed because\u2026</h2><span class="mono faint" style="color:var(--coral-ink)">rolled back 13:10</span></div>
+      <div class="panel pad" style="border-color:var(--coral)">
+        <div class="small"><b>v15 was applied, then rolled back at 13:10.</b> Next action reverted to <b>follow-up Thursday 9:12 AM</b> (v14 behavior). The v15 entry stays in the policy timeline below as an audit record.</div>
+        <button class="btn btn-ghost btn-sm" style="margin-top:10px" data-a="nav" data-r="activity">See the rollback event ${icon('i-chev')}</button>
+      </div>`:`
+      <div class="sec-h"><h2>Next action changed because\u2026</h2></div>
+      <div class="panel pad"><span class="faint small">Nothing changed yet today \u2014 approve an action and watch this space fill in. The last change (v14, yesterday) is shown below.</span></div>`}
+
+      <div class="sec-h"><h2>Variant performance <span class="faint small">\u00b7 reply rate with 90% uncertainty</span></h2></div>
+      <div class="panel" style="overflow-x:auto" data-wf="VARIANTS + UNCERTAINTY">
+        <table class="vt"><thead><tr><th>Variant</th><th>Sent</th><th>Replies</th><th>Reply rate \u00b7 90% CI</th><th>Share of sends</th></tr></thead><tbody>
+        ${DB.variants.map(v=>`<tr class="${v.fav?'fav':''}"><td><b>${v.id} \u00b7 ${v.name}</b>${v.fav?' <span class="pill info">Thompson favorite</span>':''}</td>
+          <td class="mono">${v.sent}</td><td class="mono">${v.replies}</td>
+          <td><div class="ci"><span style="width:34px;display:inline-block"><b style="color:var(--ink)">${v.rate}%</b></span>
+            <svg width="70" height="12" aria-hidden="true"><line x1="0" y1="6" x2="70" y2="6" stroke="var(--line)"/><line x1="${(v.ci[0]/35*70).toFixed(1)}" y1="6" x2="${(v.ci[1]/35*70).toFixed(1)}" y2="6" stroke="${v.fav?'var(--teal)':'var(--faint)'}" stroke-width="4" stroke-linecap="round"/><line x1="${(v.rate/35*70).toFixed(1)}" y1="2" x2="${(v.rate/35*70).toFixed(1)}" y2="10" stroke="var(--ink)"/></svg>
+            <span>${v.ci[0]}\u2013${v.ci[1]}%</span></div></td>
+          <td><div class="meter" style="width:90px"><i style="width:${v.share}%"></i></div><span class="mono faint">${v.share}%</span></td></tr>`).join('')}
+        </tbody></table></div>
+
+      <div class="sec-h"><h2>Feedback taxonomy <span class="faint small">\u00b7 your rejections, by reason</span></h2></div>
+      <div class="panel pad" data-wf="FEEDBACK TAXONOMY">
+        ${DB.feedback.map(f=>`<div class="fb-row"><span>${f[0]}</span><div class="meter"><i style="width:${f[1]/4*100}%"></i></div><span class="mono faint">${f[1]}\u00d7</span></div>`).join('')}
+        <p class="faint small" style="margin-top:10px">Every rejection reason trains drafting + targeting. \u201cToo long\u201d and \u201ctoo salesy\u201d already changed policy twice.</p></div>
+    </div>
+    <div>
+      <div class="sec-h"><h2>Policy timeline</h2><span class="mono faint">v${S.demo.policy} active</span></div>
+      <div class="panel" data-wf="POLICY TIMELINE + ROLLBACK">
+        ${pols.slice().reverse().map(p=>`<div class="pol">
+          <span class="v">v${p.v}</span>
+          <div class="what"><b>${p.what}</b><div class="sub">${p.sub}</div>
+            <div class="mono faint" style="font-size:10px;margin-top:4px">${p.when} \u00b7 trigger: ${p.trig}</div></div>
+          ${p.v===S.demo.policy&&S.demo.outcome&&p.v===15?`<button class="btn btn-danger btn-sm" data-a="rollback">Roll back</button>`
+            :p.v===15&&S.demo.rolled?`<span class="pill risk">rolled back</span>`
+            :p.v===S.demo.policy?`<span class="pill ok"><span class="dot"></span>active</span>`:`<span class="pill plain">superseded</span>`}</div>`).join('')}
+      </div>
+      <div class="panel pad" style="margin-top:16px" data-wf="TIMING PERFORMANCE">
+        <h4 class="mono faint" style="margin-bottom:8px">WHEN EMAILS WIN</h4>
+        ${DB.timing.map(t=>`<div class="fb-row"><span class="small">${t[0]}</span><div class="meter"><i style="width:${t[1]/20*100}%"></i></div><span class="mono">${t[1]}%</span></div>`).join('')}
+        <p class="faint small" style="margin-top:8px">Timing shifted automatically after 63 tracked sends.</p></div>
+      <div class="panel pad" style="margin-top:16px">
+        <h4 class="mono faint" style="margin-bottom:8px">ROLLED BACK?</h4>
+        <p class="small muted" style="line-height:1.6">Rollback restores the previous policy for <b>future</b> actions; already-sent email is untouched. Every rollback is an event in the Activity ledger \u2014 nothing disappears silently.</p></div>
+    </div>
+  </div>`;}
+
+/* ========================== RELATIONSHIPS ========================== */
+function scrRel(){
+  const g=DB.graph,sel=S.graphSel,rel=DB.rel[sel]||DB.rel.ava;
+  const selNode=g.nodes.find(n=>n.id===sel);
+  const edges=g.edges.map(e=>{
+    const a=g.nodes.find(n=>n.id===e.a),b=g.nodes.find(n=>n.id===e.b);
+    const on=(e.a==='you'&&e.b===rel.via)||(e.a===rel.via&&e.b===sel)||(e.a==='you'&&e.b===sel);
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2-30;
+    return `<path class="g-edge ${e.w===3?'m3':e.w===2?'m2':''} ${on?'sel':''}" d="M${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}"/>`;}).join('');
+  const nodes=g.nodes.map(n=>{
+    const fill=n.kind==='you'?'var(--ink)':n.kind==='conn'?'var(--teal)':'var(--surface)';
+    const stroke=n.kind==='target'?'var(--ink)':'transparent';
+    const r=n.kind==='you'?16:13;
+    return `<g class="g-node" data-a="gnode" data-id="${n.id}" role="button" tabindex="0" aria-label="${n.l1}">
+      <circle cx="${n.x}" cy="${n.y}" r="${n.id===sel?r+3:r}" fill="${fill}" stroke="${stroke}" stroke-width="1.5" ${n.id===sel?'style="stroke:var(--teal);stroke-width:3"':''}/>
+      <text x="${n.x}" y="${n.y+4}" text-anchor="middle" ${n.kind==='target'?'style="fill:var(--ink);font-weight:600"':'style="fill:oklch(98% .005 85);font-weight:600"'}>${n.l1.split(' ')[0][0]}${n.l1.split(' ')[1]?n.l1.split(' ')[1][0]:''}</text>
+      <text x="${n.x}" y="${n.y+r+14}" text-anchor="middle">${n.l1}</text>
+      <text x="${n.x}" y="${n.y+r+25}" text-anchor="middle" class="role">${n.l2}</text></g>`;}).join('');
+  const conns=[['marcus','Marcus Reed',.86,'12 interactions \u00b7 met Dec','~60d to cool',78],
+               ['dana','Dana Ruiz',.62,'8 interactions \u00b7 client','~45d to cool',64],
+               ['leo','Leo Marsh',.25,'1 exchange \u00b7 cold-ish','~15d to cool',22]];
+  return `
+  <div class="rel-grid" data-wf="RELATIONSHIPS WORKSPACE">
+    <div>
+      <div class="sec-h" style="margin-top:0"><h2>Strongest connectors</h2></div>
+      <div class="panel pad" data-wf="CONNECTORS">
+        ${conns.map(c=>`<div class="conn" data-a="gnode" data-id="${c[0]}" role="button" tabindex="0">
+          <div class="ct-ava" style="width:30px;height:30px;font-size:11px;background:var(--teal-soft);color:var(--teal-ink)">${c[1].split(' ').map(w=>w[0]).join('')}</div>
+          <div><b style="font-size:13px">${c[1]}</b><div class="mono faint">${c[3]}</div></div>
+          <div style="text-align:right"><span class="mono"><b>${c[2]}</b></span><div class="mono faint" style="font-size:10px">${c[4]}</div></div></div>`).join('')}
+      </div>
+      <div class="panel pad" style="margin-top:14px"><h4 class="mono faint" style="margin-bottom:8px">WHY GRAPHS DECAY</h4>
+        <p class="small muted" style="line-height:1.6">Warmth fades without contact. Bars show time left before each path cools \u2014 Loop re-prioritizes paths before they expire.</p></div>
+    </div>
+    <div class="graph-wrap" data-wf="RELATIONSHIP GRAPH">
+      <svg viewBox="0 0 740 460" role="img" aria-label="Warm relationship graph">${edges}${nodes}</svg>
+      <div class="legend"><span><i></i>cold / weak</span><span class="l2"><i></i>medium</span><span class="l3"><i></i>strong</span><span class="ls"><i></i>recommended path (animated)</span>
+        <span style="margin-left:auto">tap any node</span></div>
+    </div>
+    <div>
+      <div class="sec-h" style="margin-top:0"><h2>${selNode?selNode.l1:'Ava Chen'} <span class="faint small">\u00b7 ${DB.rel[sel]?'target path':'connector'}</span></h2></div>
+      ${DB.rel[sel]?`
+      <div class="intro-path" data-wf="INTRO PATH">${rel.path.map((p,i)=>`<span class="n ${i===0?'first':''}">${p}</span>${i<rel.path.length-1?'<span class="arr" style="color:var(--teal-strong)">\u2192</span>':''}`).join('')}</div>
+      <div class="panel pad">
+        <dl class="dl"><dt>Path strength</dt><dd><b>${rel.strength}</b> \u00b7 ${rel.strength>.6?'strong':'medium'}</dd>
+          <dt>Source</dt><dd class="small">${rel.source}</dd><dt>Last interaction</dt><dd>${rel.last}</dd>
+          <dt>Warmth decay</dt><dd><div class="decay"><div class="track"><i style="width:${rel.decay}%"></i></div><span class="mono faint">${rel.fade}</span></div></dd></dl>
+        <p class="small" style="margin-top:10px;line-height:1.6"><b>Why this intro:</b> ${rel.why}</p>
+        <button class="btn btn-primary" style="width:100%;margin-top:12px" data-a="queueIntro">${icon('i-mail')} Draft intro request for ${rel.path[1].split(' ')[0]}</button>
+        <div class="mono faint" style="margin-top:8px">goes to Approvals \u00b7 never sends without you</div>
+      </div>`:`
+      <div class="panel pad"><h4 class="mono faint" style="margin-bottom:8px">CONNECTOR DETAIL</h4>
+        <p class="small muted" style="line-height:1.6">Select a target on the graph to see recommended paths through this connector.</p></div>`}
+    </div>
+  </div>`;}
+
+/* ============================ SETTINGS ============================ */
+const setSections=[['mode','Operating mode'],['scope','Autopilot scope'],['rules','Approval rules'],['guard','Content guardrails'],['policy','Policy editor'],['play','Playbooks'],['integ','Integrations'],['data','Data & simulation']];
+function sw(id,val,label,desc){return `<div class="set-row"><div><b style="font-size:13.5px">${label}</b><div class="d">${desc}</div></div>
+  <button class="switch" role="switch" aria-checked="${val}" data-set="${id}" aria-label="${label}"></button></div>`;}
+function scrSettings(){
+  const st=S.set;
+  return `<div class="set-grid" data-wf="SETTINGS + AUTONOMY">
+    <div class="set-nav" role="tablist">${setSections.map(s=>`<button data-a="setSec" data-v="${s[0]}" aria-current="${S.setSection===s[0]}">${s[1]}</button>`).join('')}</div>
+    <div>
+      <div class="panel pad preview" style="margin-bottom:20px" data-wf="AUTOPILOT PREVIEW (live)"><div class="k">Live preview \u00b7 what autopilot may do without asking</div>
+        <p>${autoPreviewText()}</p></div>
+      <div class="set-sec" id="sec-mode"><h3>Operating mode</h3>
+        <div class="panel pad">
+          <div class="seg" style="margin-bottom:6px"><button data-a="mode" data-v="propose" aria-pressed="${S.mode==='propose'}" style="padding:7px 16px">Propose \u00b7 everything asks first</button>
+          <button data-a="mode" data-v="autopilot" aria-pressed="${S.mode==='autopilot'}" style="padding:7px 16px">Autopilot \u00b7 scoped execution</button></div>
+          <p class="small muted">Propose is default until you\u2019ve approved 10 actions. Loop switches nothing on its own.</p></div></div>
+      <div class="set-sec"><h3>Autopilot scope</h3><div class="panel pad">
+        ${sw('chEmail',st.chEmail,'Email channel','Autosend email within segments and budgets below')}
+        ${sw('chLi',st.chLi,'LinkedIn channel','Off \u2014 requires manual send until you enable it')}
+        <div class="set-row"><div><b style="font-size:13.5px">Segments in scope</b><div class="d">Where autopilot may act at all</div></div>
+          <div style="display:flex;gap:6px">${[['segSaas','SaaS'],['segAgency','Agency'],['segLogi','Logistics']].map(s=>`<button class="chip" data-a="seg" data-v="${s[0]}" aria-pressed="${st[s[0]]}">${s[1]}</button>`).join('')}</div></div>
+        <div class="set-row"><div><b style="font-size:13.5px">Daily budget</b><div class="d">Hard cap across ALL actions, autopilot or not</div></div>
+          <div style="display:flex;align-items:center;gap:10px"><input type="range" class="range" min="8" max="48" step="2" value="${st.budget}" data-set="budget" aria-label="Daily action budget"><span class="mono"><b id="budgetVal">${st.budget}</b>/day</span></div></div>
+        <div class="set-row"><div><b style="font-size:13.5px">Send window</b><div class="d">Nothing queues outside this window</div></div>
+          <select class="sel" data-set="win" style="height:34px">${['Mon\u2013Fri \u00b7 9 AM\u20135 PM','Mon\u2013Fri \u00b7 8 AM\u20137 PM','Weekdays + Sat AM'].map(w=>`<option ${st.win===w?'selected':''}>${w}</option>`).join('')}</select></div>
+        <div class="set-row"><div><b style="font-size:13.5px">Per-contact frequency</b><div class="d">Enforced by guardrail, not goodwill</div></div>
+          <select class="sel" data-set="freq" style="height:34px">${['1 touch / 7 days','1 touch / 14 days','2 touches / 30 days'].map(w=>`<option ${st.freq===w?'selected':''}>${w}</option>`).join('')}</select></div>
+      </div></div>
+      <div class="set-sec"><h3>Approval rules \u00b7 always ask</h3><div class="panel pad">
+        ${sw('apolIntro',st.apolIntro,'Intro requests','Anything that uses another person\u2019s name or relationship')}
+        ${sw('apolExt',st.apolExt,'External actions','Anything leaving email/LinkedIn, e.g. gifts, events')}
+        ${sw('apolBudget',st.apolBudget,'Budget exceptions','Anything that would exceed the daily cap')}
+      </div></div>
+      <div class="set-sec"><h3>Content guardrails</h3><div class="panel pad">
+        <div class="code">{
+  <span class="k">"banned_phrases"</span>: [<span class="s">"revolutionary"</span>, <span class="s">"game-changer"</span>, <span class="s">"synergy"</span>],
+  <span class="k">"claims"</span>: <span class="s">"every number must match a source"</span>,
+  <span class="k">"tone_assertiveness_max"</span>: <span class="n">0.55</span>,
+  <span class="k">"personalization_depth_min"</span>: <span class="n">2</span>
+}</div>
+        <p class="small muted" style="margin-top:10px">Editing rules creates a new policy version \u2014 versioned, diffable, rollback-able in Learning.</p></div></div>
+      <div class="set-sec"><h3>Playbooks</h3><div class="panel pad">
+        ${[['Funding follow-up','warm intro \u00b7 3-touch \u00b7 12d arc','active'],['Podcast pain-point','case study \u00b7 2-touch','active'],['Reconnect \u2014 dormant 180d+','single touch \u00b7 soft','paused']].map(p=>`
+        <div class="set-row"><div><b style="font-size:13.5px">${p[0]}</b><div class="d mono">${p[1]}</div></div><span class="pill ${p[2]==='active'?'ok':'plain'}">${p[2]}</span></div>`).join('')}</div></div>
+      <div class="set-sec"><h3>Integrations</h3><div class="panel pad">
+        ${sw('sim',st.sim,'Simulation mode','Outcomes are simulated \u2014 nothing real ever sends')}
+        <div class="set-row"><div><b style="font-size:13.5px">Email \u00b7 Kestrel Labs</b><div class="d">Connected \u00b7 send-as verified \u00b7 reputation 96/100</div></div><span class="pill ok">connected</span></div>
+        <div class="set-row"><div><b style="font-size:13.5px">LinkedIn</b><div class="d">Not connected \u2014 channel disabled</div></div><span class="pill plain">off</span></div>
+        <div class="set-row"><div><b style="font-size:13.5px">CRM sync</b><div class="d">One-way export of outcomes \u00b7 nightly</div></div><span class="pill plain">off</span></div>
+      </div></div>
+    </div></div>`;}
+/* ===================== ROUTER + SCREEN REGISTRY ===================== */
+const SCREENS={today:scrToday,opportunities:scrOpps,approvals:scrApprovals,review:scrReview,
+  activity:scrActivity,learning:scrLearning,relationships:scrRel,settings:scrSettings};
+
+/* ============================ TOASTS ============================ */
+function toast(msg,kind='info',ic='i-info'){
+  const el=document.createElement('div');el.className='toast '+kind;
+  el.innerHTML=`${icon(ic)}<span>${msg}</span>`;$('#toasts').appendChild(el);
+  setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),300);},4200);}
+
+/* ===================== DEMO ENGINE (the 11 moments) =====================
+   1 funding signal → 2 open opp → 3 why selected → 4 proposed action →
+   5 edit → 6 approve+note → 7 execute (sim) → 8 outcome → 9 policy v15 →
+   10 next action changes → 11 inspect/rollback. State persists to storage. */
+const ALT_SUB='Acme\u2019s Series B \u2014 a small gift for the growth team';
+const ALT_BODY='Hi Ava,\n\nSaw the news \u2014 congratulations on the round.\n\nQuick idea: a 6-minute teardown of what 14 B2B analytics teams did to their CAC in the two quarters after raising. Acme-shaped, no pitch.\n\nWant it now, or after launch week?\n\n\u2014 Jordan';
+function activeBase(){return S.dec.regen?[ALT_SUB,ALT_BODY]:[DB.act.subject,DB.act.body];}
+function pushEvent(ev){DB.activity.unshift(Object.assign({id:'EV-'+Date.now()%100000},ev));}
+function rerenderIfVisible(){if(['today','activity','learning','opportunities','approvals'].includes(S.route))render();}
+function scheduleDemo(){
+  setTimeout(()=>{pushEvent({t:'11:08',actor:'AGENT',who:'Loop',co:'acme',event:'Executed in simulation',status:'ok',outcome:'Send slot compressed for demo \u00b7 was Wed 9:12 AM',pol:14,reason:'Guardrails re-checked \u00b7 5/5'});
+    toast('Sent in simulation \u2014 guardrails re-checked, 5/5','ok','i-check');save();rerenderIfVisible();},2600);
+  setTimeout(()=>{S.demo.outcome=true;S.demo.policy=15;
+    pushEvent({t:'13:02',actor:'AGENT',who:'Loop',co:'acme',event:'Outcome: reply \u00b7 positive',status:'ok',outcome:'\u201cTimely \u2014 can you walk Marcus\u2019s team through it?\u201d',pol:15,reason:'Warm thread \u00b7 intent to meet'});
+    pushEvent({t:'13:02',actor:'AGENT',who:'Loop',co:'acme',event:'Policy v14 \u2192 v15 applied',status:'info',outcome:'Fast-reply priority on warm threads',pol:15,reason:'Outcome: positive reply on warm path'});
+    toast('<b>Ava replied \u2014 positive.</b> Policy v15 applied \u00b7 next action changed','ok','i-up');
+    save();rerenderIfVisible();},6200);}
+
+/* ============================ ACTIONS ============================ */
+const ACTIONS={
+  nav(el){S.route=el.dataset.r;S.opp.sel=null;save();render();},
+  opp(el){S.route='opportunities';S.opp.sel=el.dataset.id;save();render();},
+  back(){S.opp.sel=null;save();render();},
+  review(){S.route='review';save();render();},
+  approve1(){S.dec.status='confirming';save();render();},
+  approve2(){S.dec.status='approved';save();
+    pushEvent({t:'11:08',actor:'USER',who:'You',co:'acme',event:'Approved warm intro email',status:'info',
+      outcome:(S.dec.edited?'With your edits':'As drafted')+(S.dec.note?' \u00b7 note: \u201c'+S.dec.note+'\u201d':''),pol:14,reason:'ACT-2214 \u00b7 human decision recorded'});
+    toast('Approved \u2014 scheduled Wed 9:12 AM (simulation)','ok','i-check');
+    scheduleDemo();render();},
+  back2edit(){S.dec.status='pending';save();render();},
+  editNote(){S.dec.status='pending';save();render();},
+  reject(){if(!S.dec.reject){toast('Pick a rejection reason first \u2014 it\u2019s how the agent learns','risk','i-flag');
+      const s=document.querySelector('[data-f="reject"]');if(s)s.focus();return;}
+    S.dec.status='rejected';const f=DB.feedback.find(x=>x[0].toLowerCase()===S.dec.reject.toLowerCase());if(f)f[1]++;
+    pushEvent({t:'11:08',actor:'USER',who:'You',co:'acme',event:'Rejected draft',status:'risk',outcome:'Reason: '+S.dec.reject+(S.dec.note?' \u00b7 \u201c'+S.dec.note+'\u201d':''),pol:14,reason:'Structured feedback \u2192 redraft'});
+    toast('Rejected \u2014 \u201c'+S.dec.reject+'\u201d recorded as feedback','info','i-flag');save();render();},
+  newdraft(){const [bSub,bBody]=activeBase();
+    S.dec.regen=!S.dec.regen;const [nSub,nBody]=activeBase();
+    S.dec.sub=(S.dec.sub===bSub||!S.dec.sub)?nSub:S.dec.sub;
+    S.dec.body=(S.dec.body===bBody||!S.dec.body)?nBody:S.dec.body;S.dec.edited=false;
+    toast('New draft requested \u2014 variant B, second angle','info','i-loopa');save();render();},
+  'newdraft-inline'(){S.route='review';ACTIONS.newdraft();},
+  pause(){S.paused=!S.paused;toast(S.paused?'Agent paused \u2014 approvals still queue, nothing sends':'Agent resumed \u2014 heartbeat live',S.paused?'risk':'ok',S.paused?'i-pause':'i-play');save();render();},
+  mode(el){const v=el.dataset.v;if(v===S.mode)return;
+    if(v==='autopilot'){S.mode='autopilot';toast('Autopilot on \u2014 scoped per Settings. Intros, external actions, budget exceptions still ask you.','info','i-play');}
+    else{S.mode='propose';toast('Autopilot off \u2014 every action asks first','info','i-pause');}
+    save();render();},
+  trace(el){openTrace(el.dataset.id||'ACT-2214');},
+  closeTrace(){$('#overlay').classList.remove('show');},
+  traceStage(el){traceSel=+el.dataset.i;
+    $$('#overlay .st').forEach((s,i)=>{s.classList.toggle('done',i<=traceSel);s.classList.toggle('now',i===traceSel+1);});renderTraceDetail();},
+  expand(el,ev){const row=el.closest('.ev');row.classList.toggle('open');
+    el.setAttribute('aria-expanded',row.classList.contains('open'));ev.stopPropagation();},
+  actfilter(el){S.actFilter=el.dataset.v;save();render();},
+  sigfilter(el){S.opp.sig=el.dataset.v;save();render();},
+  gnode(el){S.route='relationships';S.graphSel=el.dataset.id;save();render();},
+  queueIntro(){S.dec.introQueued=true;
+    pushEvent({t:'11:20',actor:'USER',who:'You',co:'elmoak',event:'Queued intro request',status:'warn',outcome:'Ask Marcus Reed to intro to Ava Chen',pol:14,reason:'From Relationships \u00b7 needs approval'});
+    toast('Intro request drafted \u2014 added to Approvals','ok','i-mail');save();render();},
+  rollback(){S.demo.policy=14;S.demo.rolled=true;
+    pushEvent({t:'13:10',actor:'USER',who:'You',co:'acme',event:'Policy rolled back v15 \u2192 v14',status:'info',outcome:'Next action reverts to follow-up Thu 9:12',pol:14,reason:'Manual rollback \u00b7 Learning'});
+    toast('Rolled back to v14 \u2014 Acme next action reverted','info','i-back');save();render();},
+  setSec(el){S.setSection=el.dataset.v;save();render();},
+  seg(el){S.set[el.dataset.v]=!S.set[el.dataset.v];save();render();},
+  approvItem(){toast('This draft opens once GET /api/v1/decisions/{id} serves it \u2014 honest stub','info','i-info');},
+  more(){$('#overlay').innerHTML=`<div class="trace-modal" style="max-width:320px;padding:10px 8px">
+    ${[['learning','Learning','i-loopa'],['relationships','Relationships','i-nodes'],['settings','Settings','i-slid'],['review','Action review','i-mail']].map(n=>
+    `<button class="nav-item" data-a="nav2" data-r="${n[0]}" style="width:100%">${icon(n[2])}${n[1]}</button>`).join('')}</div>`;
+    $('#overlay').classList.add('show');},
+  nav2(el){ACTIONS.closeTrace();S.route=el.dataset.r;save();render();},
+  noop(){},
+  tweaks(){const p=$('#tweaksPanel');p.classList.toggle('show');
+    $('[data-a="tweaks"]').setAttribute('aria-expanded',p.classList.contains('show'));},
+  accent(el){TW.accent=el.dataset.v;saveT();applyTweaks();
+    $$('[data-a="accent"]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===TW.accent)));},
+  reset(){localStorage.removeItem('loop.v1');localStorage.removeItem('loop.tweaks');location.reload();}
+};
+document.addEventListener('click',e=>{
+  const sw=e.target.closest('[data-set][role="switch"]');
+  if(sw){const k=sw.dataset.set;S.set[k]=!S.set[k];save();
+    if(k==='sim')toast(S.set.sim?'Simulation mode on \u2014 outcomes modeled, nothing real sends':'Simulation off \u2014 real sends (careful)','info','i-info');
+    render();return;}
+  const el=e.target.closest('[data-a]');if(!el)return;
+  const fn=ACTIONS[el.dataset.a];if(fn)fn(el,e);
+  if(el.dataset.a==='nav'||el.dataset.a==='opp')e.preventDefault();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){$('#overlay').classList.remove('show');$('#tweaksPanel').classList.remove('show');return;}
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches('[role="button"]')){e.preventDefault();e.target.click();}});
+document.addEventListener('input',e=>{
+  const f=e.target.dataset.f;if(!f)return;
+  if(f==='q'){S.opp.q=e.target.value;const q=S.opp.q.toLowerCase();
+    $$('.opp-row').forEach(r=>{const hit=r.textContent.toLowerCase().includes(q);r.style.display=hit?'':'none';});return;}
+  if(f==='sub'||f==='body'){S.dec[f]=e.target.value;const [bSub,bBody]=activeBase();
+    S.dec.edited=(S.dec.sub||'')!==bSub||(S.dec.body||'')!==bBody;
+    const b=$('.edited-badge');if(b)b.classList.toggle('on',S.dec.edited);save();return;}
+  if(f==='note'){S.dec.note=e.target.value;save();}});
+document.addEventListener('change',e=>{
+  const f=e.target.dataset.f;
+  if(f==='sort'){S.opp.sort=e.target.value;save();render();}
+  if(f==='reject'){S.dec.reject=e.target.value;}
+  const set=e.target.dataset.set;
+  if(set==='budget'){S.set.budget=+e.target.value;const bv=$('#budgetVal');if(bv)bv.textContent=e.target.value;save();render();}
+  if(set==='win'||set==='freq'){S.set[set]=e.target.value;save();render();}});
+$('#overlay').addEventListener('click',e=>{if(e.target.id==='overlay')ACTIONS.closeTrace();});
+
+/* ===================== TWEAKS / MOBILE / HEARTBEAT ===================== */
+function applyTweaks(){
+  document.body.classList.toggle('wireframe',TW.wireframe);
+  document.body.classList.toggle('accent-blue',TW.accent==='blue');
+  document.body.classList.toggle('compact',TW.compact);
+  const forced=TW.forced;document.body.classList.toggle('forced',forced);
+  syncMobile();saveT();}
+function syncMobile(){
+  const mq=(typeof matchMedia==='function')?matchMedia('(max-width: 860px)').matches:false;
+  document.body.classList.toggle('is-mobile',mq||TW.forced);}
+try{matchMedia('(max-width: 860px)').addEventListener('change',syncMobile);}catch(e){try{matchMedia('(max-width: 860px)').addListener(syncMobile);}catch(x){}}
+$$('#tweaks [data-t]').forEach(b=>b.addEventListener('click',()=>{
+  TW[b.dataset.t]=!TW[b.dataset.t];b.setAttribute('aria-checked',String(TW[b.dataset.t]));applyTweaks();
+  if(b.dataset.t==='wireframe')toast(TW.wireframe?'Wireframe on \u2014 structure over style':'Hi-fidelity restored','info','i-tune');}));
+setInterval(()=>{if(!S.paused){S.hb=(S.hb+1)%16;}
+  $$('.hb-time').forEach(t=>t.textContent=S.paused?'held':S.hb+'s');},1000);
+
+/* ============================ BOOT ============================ */
+try{
+  applyTweaks();
+  $$('#tweaks [data-t]').forEach(b=>b.setAttribute('aria-checked',String(TW[b.dataset.t])));
+  $$('[data-a="accent"]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===TW.accent)));
+  render();
+}catch(e){console.error('boot',e);
+  try{const v=document.getElementById('view');if(v)v.innerHTML='<div class="view-inner"><div class="panel pad" style="border-color:#c0564a"><b style="font-family:Georgia,serif;font-size:16px">Loop failed to start</b><pre style="font:11px/1.6 ui-monospace,Menlo,monospace;white-space:pre-wrap;margin:10px 0 0;color:#6f6a5e">'+String((e&&e.stack)||e).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];})+'</pre></div></div>';}catch(x){}}
+if(S.dec.status==='approved'&&!S.demo.outcome&&!S.demo.rolled){/* restored mid-demo: outcome stays pending until next session */}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "Loop — GTM Operator Console",
+  "entry": "loop-gtm-operator-console-4.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-08-15T17:25:55.448Z",
+  "updatedAt": "2026-08-15T17:25:55.453Z",
+  "metadata": {
+    "identifier": "loop-gtm-operator-console",
+    "artifactType": "text/html",
+    "inferred": false
+  }
+}
