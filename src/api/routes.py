@@ -44,10 +44,20 @@ class RejectRequest(BaseModel):
     note: str = ""
 
 
+class ApproveRequest(BaseModel):
+    note: str = ""
+
+
 class EditRequest(BaseModel):
     subject: str = ""
     body: str = ""
     note: str = ""
+
+
+class DecisionMutationResponse(BaseModel):
+    status: str
+    action_id: str
+    reason: str | None = None
 
 
 # --- Approval queue ----------------------------------------------------------
@@ -94,7 +104,7 @@ def get_decision_card(action_id: str) -> dict:
 # --- Decision endpoints ------------------------------------------------------
 
 @router.post("/decisions/{action_id}/approve")
-def approve_action(action_id: str, req: RejectRequest | None = None) -> dict:
+def approve_action(action_id: str, req: ApproveRequest | None = None) -> DecisionMutationResponse:
     """Approve an action for execution."""
     conn = connect()
     try:
@@ -115,16 +125,14 @@ def approve_action(action_id: str, req: RejectRequest | None = None) -> dict:
         )
         note = req.note if req else ""
         log_activity(conn, Actor.USER.value, action_id, "approve", status=ActionStatus.APPROVED.value, detail=note)
-        if note:
-            apply_feedback(conn, action_id, reason=None, edits={"personalization_count": 0})
         conn.commit()
-        return {"status": "approved", "action_id": action_id}
+        return DecisionMutationResponse(status="approved", action_id=action_id)
     finally:
         conn.close()
 
 
 @router.post("/decisions/{action_id}/reject")
-def reject_action(action_id: str, req: RejectRequest) -> dict:
+def reject_action(action_id: str, req: RejectRequest) -> DecisionMutationResponse:
     """Reject an action with a reason."""
     conn = connect()
     try:
@@ -150,13 +158,13 @@ def reject_action(action_id: str, req: RejectRequest) -> dict:
         )
         apply_feedback(conn, action_id, reason=req.reason)
         conn.commit()
-        return {"status": "rejected", "action_id": action_id, "reason": req.reason}
+        return DecisionMutationResponse(status="rejected", action_id=action_id, reason=req.reason)
     finally:
         conn.close()
 
 
 @router.post("/decisions/{action_id}/edit")
-def edit_action(action_id: str, req: EditRequest) -> dict:
+def edit_action(action_id: str, req: EditRequest) -> DecisionMutationResponse:
     """Edit an action's message and approve it."""
     conn = connect()
     try:
@@ -193,7 +201,7 @@ def edit_action(action_id: str, req: EditRequest) -> dict:
             edits["tone"] = "warmer" if any(w in req.body.lower() for w in ["hi", "hello", "thanks"]) else "cooler"
         apply_feedback(conn, action_id, edits=edits if edits else None)
         conn.commit()
-        return {"status": "edited", "action_id": action_id}
+        return DecisionMutationResponse(status="edited", action_id=action_id)
     finally:
         conn.close()
 

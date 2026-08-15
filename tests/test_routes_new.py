@@ -284,3 +284,29 @@ class TestOperatorResources:
     def test_missing_opportunity_is_404(self, client):
         resp = client.get("/api/v1/opportunities/not-found")
         assert resp.status_code == 404
+
+
+class TestDecisionMutations:
+    def test_approve_without_note(self, client):
+        resp = client.post("/api/v1/decisions/act-api-opportunity/approve", json={})
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "approved", "action_id": "act-api-opportunity", "reason": None}
+
+    def test_approve_with_note_records_activity(self, client):
+        resp = client.post(
+            "/api/v1/decisions/act-api-opportunity/approve",
+            json={"note": "Keep the funding angle"},
+        )
+        assert resp.status_code == 200
+        activity = client.get("/api/v1/activity", params={"event": "approve"}).json()
+        assert any(item["action_id"] == "act-api-opportunity" and item["detail"] == "Keep the funding angle" for item in activity)
+
+    def test_duplicate_approval_is_rejected(self, client):
+        first = client.post("/api/v1/decisions/act-api-opportunity/approve", json={})
+        second = client.post("/api/v1/decisions/act-api-opportunity/approve", json={})
+        assert first.status_code == 200
+        assert second.status_code == 400
+
+    def test_approve_missing_action_is_404(self, client):
+        resp = client.post("/api/v1/decisions/missing/approve", json={})
+        assert resp.status_code == 404
