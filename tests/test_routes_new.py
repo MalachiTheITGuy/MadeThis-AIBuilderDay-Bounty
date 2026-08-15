@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,6 +25,20 @@ def _seed_db(tmp_path):
     from src.store.db import connect
     conn = connect(db_path)
     seed(conn)
+    conn.execute(
+        "INSERT INTO signals (id, company_id, type, payload, detected_at) "
+        "VALUES ('sig-api-opportunity', 'c-acme', 'FUNDING', '{\"amount\":\"$5M\"}', ?)",
+        (datetime.now(UTC).isoformat(),),
+    )
+    conn.execute(
+        "INSERT INTO opportunities (id, company_id, signal_id, status, score, fit_notes, decision_trace) "
+        "VALUES ('opp-api-opportunity', 'c-acme', 'sig-api-opportunity', 'QUALIFIED', 0.9, '[\"funding signal\"]', '{}')"
+    )
+    conn.execute(
+        "INSERT INTO actions (id, opportunity_id, contact_id, action_type, variant_id, channel, timing, mode, status, subject, body, cost_units, policy_version) "
+        "VALUES ('act-api-opportunity', 'opp-api-opportunity', 'p-acme-ceo', 'OUTREACH_EMAIL', 'v-saas-email-warm-morning', 'EMAIL', 'MORNING', 'PROPOSE', 'PROPOSED', 'Test subject', 'Test body', 1, 1)"
+    )
+    conn.commit()
     conn.close()
     yield
     _db.DB_PATH = _orig
@@ -217,3 +232,55 @@ class TestControlScope:
         scope = resp.json()["scope"]
         assert scope["max_sends_per_day"] == 5
         assert scope["allowed_channels"] == ["EMAIL"]
+
+    def test_get_scope(self, client):
+        client.post("/api/v1/control/scope", json={"allowed_segments": ["saas-b2b"]})
+        resp = client.get("/api/v1/control/scope")
+        assert resp.status_code == 200
+        assert resp.json()["scope"]["allowed_segments"] == ["saas-b2b"]
+
+
+class TestOperatorResources:
+    def test_get_opportunities(self, client):
+        resp = client.get("/api/v1/opportunities")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] > 0
+        assert data["items"]
+        assert "company" in data["items"][0]
+        assert "signal" in data["items"][0]
+        assert "current_action" in data["items"][0]
+
+    def test_get_opportunity_detail(self, client):
+        opportunity = client.get("/api/v1/opportunities").json()["items"][0]
+        resp = client.get(f"/api/v1/opportunities/{opportunity['id']}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == opportunity["id"]
+        assert "signal_timeline" in data
+        assert "relationship_edges" in data
+        assert "what_would_change_this" in data
+
+    def test_opportunity_filters(self, client):
+        resp = client.get("/api/v1/opportunities", params={"signal_type": "FUNDING", "limit": 1})
+        assert resp.status_code == 200
+        assert all(item["signal"]["type"] == "FUNDING" for item in resp.json()["items"])
+
+    def test_learning_changes_and_policy_history(self, client):
+        changes = client.get("/api/v1/learning/changes")
+        history = client.get("/api/v1/policy/history")
+        assert changes.status_code == 200
+        assert history.status_code == 200
+        assert changes.json()["active_policy_version"] >= 1
+        assert history.json()[0]["version"] == 1
+
+    def test_action_timeline(self, client):
+        resp = client.get("/api/v1/actions/act-api-opportunity/timeline")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["stages"]) == 9
+        assert data["stages"][0]["name"] == "Signal"
+
+    def test_missing_opportunity_is_404(self, client):
+        resp = client.get("/api/v1/opportunities/not-found")
+        assert resp.status_code == 404

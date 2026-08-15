@@ -42,15 +42,32 @@ export interface Contact {
 
 export interface Opportunity {
   id: string
-  signal_id: string
   company_id: string
-  contact_id: string
-  qualification_score: number
+  company: Company
+  contact?: Contact
+  signal: Signal
+  score: number
   fit_notes: string[]
-  icp_hits: string[]
-  status: 'QUALIFIED' | 'PLANNED' | 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'SENT' | 'OUTCOME_RECORDED' | 'LEARNING_APPLIED' | 'DISMISSED' | 'SKIPPED'
+  status: string
+  pipeline_stage: string
+  arr: number
+  current_action?: Action
   created_at: string
-  updated_at: string
+}
+
+export interface OpportunitiesResponse {
+  items: Opportunity[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface OpportunityDetail extends Opportunity {
+  signal_timeline: Signal[]
+  previous_actions: Array<Record<string, unknown>>
+  relationship_edges: Array<Record<string, unknown>>
+  why_now: string
+  what_would_change_this: string[]
 }
 
 export interface Action {
@@ -70,6 +87,7 @@ export interface Action {
   contact_title?: string
   company_name?: string
   cost_units?: number
+  policy_version?: number
   status: 'PLANNED' | 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'EDITED' | 'SENT' | 'FAILED'
   decision_trace?: DecisionTrace
   created_at: string
@@ -198,6 +216,54 @@ export interface PipelineStage {
   arr: number
 }
 
+export interface DecisionCard {
+  action_id: string
+  action_type: Action['action_type']
+  target: string
+  channel: Action['channel']
+  timing: string
+  cost_units: number
+  why: string[]
+  evidence: string[]
+  guardrails: string[]
+  learned: string[]
+  next_steps: string
+  expected_effect: string
+}
+
+export interface ActionTimeline {
+  action_id: string
+  status: string
+  policy_version: number
+  stages: Array<{ index: number; name: string; detail: string; completed: boolean }>
+  activity: ActivityLog[]
+  outcome?: Outcome | null
+}
+
+export interface LearningChanges {
+  active_policy_version: number
+  policies: Array<{ version: number; policy: Record<string, unknown>; created_at: string; source: string }>
+  feedback: ActivityLog[]
+  outcomes: Array<Record<string, unknown>>
+}
+
+export interface PolicyVersion {
+  version: number
+  policy: Record<string, unknown>
+  created_at: string
+  source: string
+  diff: Record<string, { before?: unknown; after?: unknown }>
+}
+
+export interface AutopilotScope {
+  enabled: boolean
+  allowed_segments: string[]
+  allowed_channels: string[]
+  allowed_timing: string[]
+  max_sends_per_day: number
+  max_cost_units_per_action: number
+}
+
 // API Client
 const API_BASE = '/api/v1'
 
@@ -224,12 +290,25 @@ export const api = {
   getStatus: () => fetchApi<SystemStatus>('/status'),
   getBriefing: () => fetchApi<Briefing>('/briefing'),
   getPipeline: () => fetchApi<PipelineStage[]>('/pipeline'),
+  getOpportunities: (params?: { q?: string; status?: string; signal_type?: string; limit?: number; offset?: number }) => {
+    const search = new URLSearchParams()
+    Object.entries(params || {}).forEach(([key, value]) => { if (value !== undefined && value !== '') search.set(key, String(value)) })
+    return fetchApi<OpportunitiesResponse>(`/opportunities?${search.toString()}`)
+  },
+  getOpportunity: (id: string) => fetchApi<OpportunityDetail>(`/opportunities/${id}`),
+  getDecision: (id: string) => fetchApi<DecisionCard>(`/decisions/${id}`),
+  getActionTimeline: (id: string) => fetchApi<ActionTimeline>(`/actions/${id}/timeline`),
+  getLearningChanges: () => fetchApi<LearningChanges>('/learning/changes'),
+  getPolicyHistory: () => fetchApi<PolicyVersion[]>('/policy/history'),
+  getScope: () => fetchApi<{ scope: AutopilotScope }>('/control/scope'),
   getAuditExplain: (id: string) => fetchApi<Record<string, unknown>>(`/audit/explain/${id}`),
   pause: () => fetchApi<void>('/control/pause', { method: 'POST' }),
   stop: () => fetchApi<void>('/control/stop', { method: 'POST' }),
   resume: () => fetchApi<void>('/control/resume', { method: 'POST' }),
   setMode: (mode: 'PROPOSE' | 'AUTOPILOT') => 
     fetchApi<void>(`/control/mode`, { method: 'POST', body: JSON.stringify({ mode }) }),
+  setScope: (scope: Partial<AutopilotScope>) =>
+    fetchApi<{ scope: AutopilotScope }>('/control/scope', { method: 'POST', body: JSON.stringify(scope) }),
 
   // Queue
   getQueue: () => fetchApi<Action[]>('/queue'),

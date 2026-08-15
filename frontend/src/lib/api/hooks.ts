@@ -26,6 +26,39 @@ export function usePipeline() {
   })
 }
 
+export function useOpportunities(params?: { q?: string; status?: string; signal_type?: string; limit?: number; offset?: number }) {
+  return useQuery({ queryKey: ['opportunities', params], queryFn: () => api.getOpportunities(params), refetchInterval: 10000 })
+}
+
+export function useOpportunity(id?: string) {
+  return useQuery({ queryKey: ['opportunity', id], queryFn: () => api.getOpportunity(id!), enabled: Boolean(id) })
+}
+
+export function useDecision(id?: string) {
+  return useQuery({ queryKey: ['decision', id], queryFn: () => api.getDecision(id!), enabled: Boolean(id) })
+}
+
+export function useActionTimeline(id?: string) {
+  return useQuery({ queryKey: ['actionTimeline', id], queryFn: () => api.getActionTimeline(id!), enabled: Boolean(id) })
+}
+
+export function useLearningChanges() {
+  return useQuery({ queryKey: ['learningChanges'], queryFn: api.getLearningChanges, refetchInterval: 15000 })
+}
+
+export function usePolicyHistory() {
+  return useQuery({ queryKey: ['policyHistory'], queryFn: api.getPolicyHistory, refetchInterval: 30000 })
+}
+
+export function useScope() {
+  return useQuery({ queryKey: ['scope'], queryFn: api.getScope, refetchInterval: 30000 })
+}
+
+export function useSetScope() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: api.setScope, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scope'] }) })
+}
+
 export function useAuditExplain(id?: string) {
   return useQuery({
     queryKey: ['auditExplain', id],
@@ -175,4 +208,12 @@ export function useWarmEdges() {
     queryFn: api.getWarmEdges,
     refetchInterval: 30000,
   })
+}
+
+export function useCompanies() {
+  return useQuery({ queryKey: ['companies'], queryFn: api.getCompanies, refetchInterval: 30000 })
+}
+
+export function useContacts(companyId?: string) {
+  return useQuery({ queryKey: ['contacts', companyId], queryFn: () => api.getContacts(companyId), refetchInterval: 30000 })
 }
