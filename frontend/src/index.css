@@ -249,6 +249,13 @@ a { color: inherit; }
 .setting-row select { min-width: 120px; height: 34px; padding: 0 9px; border: 1px solid var(--loop-line); border-radius: 7px; background: var(--loop-surface); color: var(--loop-ink); font-size: 11px; }
 .settings-action-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 .settings-action-row .mono { color: var(--loop-faint); }
+.settings-secret-note { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 16px; padding: 12px 14px; border-color: var(--loop-amber); background: var(--loop-amber-soft); color: var(--loop-amber-ink); font-size: 11px; line-height: 1.5; }
+.settings-secret-note svg { flex: none; margin-top: 1px; }
+.llm-provider-actions { display: flex; align-items: center; gap: 6px; }
+.settings-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.settings-form-grid label { display: flex; flex-direction: column; gap: 5px; color: var(--loop-muted); font-size: 11px; font-weight: 600; }
+.settings-form-grid input, .settings-form-grid select { width: 100%; }
+.settings-form-grid select { height: 36px; padding: 0 9px; border: 1px solid var(--loop-line); border-radius: 7px; background: var(--loop-surface); color: var(--loop-ink); font-size: 11px; }
 
 @media (max-width: 800px) {
   .settings-page-intro { align-items: flex-start; flex-direction: column; }
@@ -256,4 +263,6 @@ a { color: inherit; }
   .settings-page-nav { width: 100%; overflow-x: auto; flex-direction: row; padding-bottom: 4px; }
   .settings-page-nav button { min-width: 145px; }
   .settings-overview-grid { grid-template-columns: 1fr; width: 100%; }
+  .settings-form-grid { grid-template-columns: 1fr; }
+  .llm-provider-actions { align-items: flex-start; flex-direction: column; }
 }
