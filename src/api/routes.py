@@ -18,7 +18,7 @@ import json
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..domain.enums import ActionStatus, Actor, Mode, OpportunityStatus, OutcomeResult
@@ -730,6 +730,248 @@ class OutcomeCreate(BaseModel):
     detail: str = ""
 
 
+# --- Enriched product resources --------------------------------------------
+
+def _json_value(value: str | None, default: object) -> object:
+    try:
+        return json.loads(value or "")
+    except (TypeError, ValueError):
+        return default
+
+
+def _opportunity_payload(conn, row, include_detail: bool = False) -> dict:
+    """Build the stable opportunity shape consumed by the operator console."""
+    contact = conn.execute(
+        "SELECT c.id, c.name, c.title, c.email, c.linkedin, c.warmth "
+        "FROM contacts c WHERE c.id = COALESCE(("
+        "SELECT a.contact_id FROM actions a WHERE a.opportunity_id = ? "
+        "ORDER BY a.created_at DESC LIMIT 1), ("
+        "SELECT c2.id FROM contacts c2 WHERE c2.company_id = ? "
+        "ORDER BY c2.name LIMIT 1))",
+        (row["id"], row["company_id"]),
+    ).fetchone()
+    action = conn.execute(
+        "SELECT * FROM actions WHERE opportunity_id = ? ORDER BY created_at DESC LIMIT 1",
+        (row["id"],),
+    ).fetchone()
+    signal_payload = _json_value(row["signal_payload"], {})
+    result = {
+        "id": row["id"],
+        "company_id": row["company_id"],
+        "company": {
+            "id": row["company_id"],
+            "name": row["company_name"],
+            "segment": row["segment"],
+            "stage": row["stage"],
+            "employees": row["employees"],
+            "tags": _json_value(row["tags"], []),
+        },
+        "contact": dict(contact) if contact else None,
+        "signal": {
+            "id": row["signal_id"],
+            "type": row["signal_type"],
+            "payload": signal_payload,
+            "detected_at": row["detected_at"],
+        },
+        "status": row["status"],
+        "score": row["score"],
+        "fit_notes": _json_value(row["fit_notes"], []),
+        "created_at": row["created_at"],
+        "pipeline_stage": row["pipeline_stage"],
+        "arr": row["arr"],
+        "current_action": dict(action) if action else None,
+    }
+    if not include_detail:
+        return result
+
+    signals = conn.execute(
+        "SELECT id, type, payload, detected_at FROM signals "
+        "WHERE company_id = ? ORDER BY detected_at DESC",
+        (row["company_id"],),
+    ).fetchall()
+    previous_actions = conn.execute(
+        "SELECT id, action_type, channel, status, subject, created_at, updated_at "
+        "FROM actions WHERE opportunity_id = ? ORDER BY created_at DESC",
+        (row["id"],),
+    ).fetchall()
+    edges = []
+    if contact:
+        edges = conn.execute(
+            "SELECT we.id, we.contact_a, we.contact_b, we.strength, we.direction, "
+            "we.last_interaction, we.source, ca.name AS contact_a_name, "
+            "cb.name AS contact_b_name FROM warm_edges we "
+            "JOIN contacts ca ON ca.id = we.contact_a JOIN contacts cb ON cb.id = we.contact_b "
+            "WHERE we.contact_a = ? OR we.contact_b = ? ORDER BY we.strength DESC",
+            (contact["id"], contact["id"]),
+        ).fetchall()
+    result["signal_timeline"] = [
+        {"id": signal["id"], "type": signal["type"], "payload": _json_value(signal["payload"], {}), "detected_at": signal["detected_at"]}
+        for signal in signals
+    ]
+    result["previous_actions"] = [dict(item) for item in previous_actions]
+    result["relationship_edges"] = [dict(edge) for edge in edges]
+    result["why_now"] = (
+        "Fresh signal with a qualified fit and an available relationship path."
+        if row["score"] >= 0.6 else "Signal remains below the current qualification threshold."
+    )
+    result["what_would_change_this"] = [
+        "New negative outcome or unsubscribe",
+        "Signal becomes stale beyond the configured window",
+        "A guardrail or contact frequency cap blocks the action",
+    ]
+    return result
+
+
+@router.get("/opportunities")
+def get_opportunities(
+    q: str = Query("", max_length=200),
+    status: str = "",
+    signal_type: str = "",
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> dict:
+    """Return enriched, filterable opportunities for the operator queue."""
+    conn = connect()
+    try:
+        conditions = []
+        params: list[Any] = []
+        if q:
+            conditions.append("(co.name LIKE ? OR ct.name LIKE ? OR s.type LIKE ? OR s.payload LIKE ?)")
+            params.extend([f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"])
+        if status:
+            conditions.append("o.status = ?")
+            params.append(status.upper())
+        if signal_type:
+            conditions.append("s.type = ?")
+            params.append(signal_type.upper())
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        base_query = (
+            "SELECT o.*, co.name AS company_name, co.segment, co.stage, co.employees, co.tags, "
+            "s.type AS signal_type, s.payload AS signal_payload, s.detected_at "
+            "FROM opportunities o JOIN companies co ON co.id = o.company_id "
+            "JOIN signals s ON s.id = o.signal_id "
+            "LEFT JOIN contacts ct ON ct.company_id = o.company_id "
+            f"{where} GROUP BY o.id ORDER BY o.score DESC, s.detected_at DESC LIMIT ? OFFSET ?"
+        )
+        rows = conn.execute(base_query, (*params, limit, offset)).fetchall()
+        total = conn.execute(
+            "SELECT COUNT(*) AS n FROM opportunities o "
+            "JOIN companies co ON co.id = o.company_id "
+            "JOIN signals s ON s.id = o.signal_id "
+            "LEFT JOIN contacts ct ON ct.company_id = o.company_id "
+            f"{where}",
+            params,
+        ).fetchone()["n"]
+        return {"items": [_opportunity_payload(conn, row) for row in rows], "total": total, "limit": limit, "offset": offset}
+    finally:
+        conn.close()
+
+
+@router.get("/opportunities/{opportunity_id}")
+def get_opportunity(opportunity_id: str) -> dict:
+    """Return one opportunity with evidence, timeline, path, and recommendation."""
+    conn = connect()
+    try:
+        row = conn.execute(
+            "SELECT o.*, co.name AS company_name, co.segment, co.stage, co.employees, co.tags, "
+            "s.type AS signal_type, s.payload AS signal_payload, s.detected_at "
+            "FROM opportunities o JOIN companies co ON co.id = o.company_id "
+            "JOIN signals s ON s.id = o.signal_id WHERE o.id = ?",
+            (opportunity_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Opportunity not found: {opportunity_id}")
+        return _opportunity_payload(conn, row, include_detail=True)
+    finally:
+        conn.close()
+
+
+@router.get("/actions/{action_id}/timeline")
+def get_action_timeline(action_id: str) -> dict:
+    """Return the persisted nine-stage trace for an action."""
+    conn = connect()
+    try:
+        action = conn.execute("SELECT * FROM actions WHERE id = ?", (action_id,)).fetchone()
+        if not action:
+            raise HTTPException(status_code=404, detail=f"Action not found: {action_id}")
+        activity = conn.execute(
+            "SELECT at, actor, event, status, outcome, reason, policy_version, detail "
+            "FROM activity WHERE action_id = ? ORDER BY at",
+            (action_id,),
+        ).fetchall()
+        outcome = conn.execute("SELECT * FROM outcomes WHERE action_id = ? ORDER BY at DESC LIMIT 1", (action_id,)).fetchone()
+        stages = [
+            ("Signal", "Signal attached to opportunity"),
+            ("Qualify", "Opportunity qualification and evidence recorded"),
+            ("Select", f"Variant {action['variant_id']} selected at {action['confidence']:.0%} confidence"),
+            ("Draft", f"{len((action['body'] or '').split())} words generated under policy v{action['policy_version']}"),
+            ("Guardrails", "Guardrail checks evaluated before execution"),
+            ("Decision", f"Human or autopilot decision: {action['status']}"),
+            ("Execute", f"{action['channel']} execution path"),
+            ("Outcome", outcome["result"] if outcome else "Pending"),
+            ("Learn", "Outcome and feedback available for policy learning" if outcome else "Awaiting outcome"),
+        ]
+        return {
+            "action_id": action_id,
+            "status": action["status"],
+            "policy_version": action["policy_version"],
+            "stages": [
+                {"index": index + 1, "name": name, "detail": detail, "completed": index < 7 or bool(outcome)}
+                for index, (name, detail) in enumerate(stages)
+            ],
+            "activity": [dict(item) for item in activity],
+            "outcome": dict(outcome) if outcome else None,
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/learning/changes")
+def get_learning_changes() -> dict:
+    """Return behavior changes derived from stored policies, feedback, and outcomes."""
+    conn = connect()
+    try:
+        policies = conn.execute("SELECT version, policy, created_at, source FROM policies ORDER BY version").fetchall()
+        feedback = conn.execute(
+            "SELECT at, action_id, event, reason, detail, policy_version FROM activity "
+            "WHERE event IN ('reject', 'edit', 'policy_update', 'policy_rollback') ORDER BY at DESC LIMIT 100"
+        ).fetchall()
+        outcomes = conn.execute(
+            "SELECT o.at, o.action_id, o.result, o.detail, a.variant_id, a.channel "
+            "FROM outcomes o JOIN actions a ON a.id = o.action_id ORDER BY o.at DESC LIMIT 100"
+        ).fetchall()
+        return {
+            "active_policy_version": policies[-1]["version"] if policies else 0,
+            "policies": [{"version": row["version"], "policy": _json_value(row["policy"], {}), "created_at": row["created_at"], "source": row["source"]} for row in policies],
+            "feedback": [dict(row) for row in feedback],
+            "outcomes": [dict(row) for row in outcomes],
+        }
+    finally:
+        conn.close()
+
+
+@router.get("/policy/history")
+def get_policy_history() -> list[dict]:
+    """Return policy versions with a simple field-level diff from the prior version."""
+    conn = connect()
+    try:
+        rows = conn.execute("SELECT version, policy, created_at, source FROM policies ORDER BY version").fetchall()
+        history = []
+        previous: dict = {}
+        for row in rows:
+            current = _json_value(row["policy"], {})
+            diff = {
+                key: {"before": previous.get(key), "after": value}
+                for key, value in current.items()
+                if previous.get(key) != value
+            }
+            history.append({"version": row["version"], "policy": current, "created_at": row["created_at"], "source": row["source"], "diff": diff})
+            previous = current
+        return history
+    finally:
+        conn.close()
+
+
 @router.post("/outcomes")
 def record_outcome(req: OutcomeCreate) -> dict:
     """Record an outcome for an action."""
@@ -810,6 +1052,12 @@ def set_mode(req: ModeRequest) -> dict:
     finally:
         conn.close()
     return {"mode": mode, "scope": scope}
+
+
+@router.get("/control/scope")
+def get_scope() -> dict:
+    """Return the persisted autopilot scope for the Settings workspace."""
+    return {"scope": _get_scope()}
 
 
 @router.post("/control/scope")
