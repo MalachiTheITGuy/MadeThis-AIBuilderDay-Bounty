@@ -246,6 +246,9 @@ a { color: inherit; }
 .settings-placeholder > p { max-width: 52ch; margin: 3px 0 17px; color: var(--loop-muted); font-size: 12px; line-height: 1.6; }
 .placeholder-status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 6px; background: var(--loop-amber-soft); color: var(--loop-amber-ink); font-family: var(--loop-mono); font-size: 9.5px; }
 .scope-number { width: 90px; }
+.setting-row select { min-width: 120px; height: 34px; padding: 0 9px; border: 1px solid var(--loop-line); border-radius: 7px; background: var(--loop-surface); color: var(--loop-ink); font-size: 11px; }
+.settings-action-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+.settings-action-row .mono { color: var(--loop-faint); }
 
 @media (max-width: 800px) {
   .settings-page-intro { align-items: flex-start; flex-direction: column; }
