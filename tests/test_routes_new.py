@@ -285,6 +285,56 @@ class TestSettingsPreferences:
         assert events[0]["detail"]
 
 
+class TestLLMSettings:
+    def test_create_test_and_activate_local_provider(self, client):
+        created = client.post("/api/v1/settings/llm/providers", json={
+            "name": "Local model",
+            "kind": "local",
+            "base_url": "local://model",
+            "model": "demo-model",
+            "capabilities": {"chat": True},
+        })
+        assert created.status_code == 200
+        provider = created.json()["provider"]
+        assert provider["api_key"] is None
+        assert provider["api_key_configured"] is True
+
+        tested = client.post(f"/api/v1/settings/llm/providers/{provider['provider_id']}/test")
+        assert tested.status_code == 200
+        assert tested.json()["healthy"] is True
+
+        active = client.put("/api/v1/settings/llm/active", json={"provider_id": provider["provider_id"]})
+        assert active.status_code == 200
+        assert client.get("/api/v1/settings/llm/active").json()["provider"]["provider_id"] == provider["provider_id"]
+
+    def test_remote_provider_without_secret_is_not_healthy(self, client):
+        created = client.post("/api/v1/settings/llm/providers", json={
+            "name": "Remote model",
+            "kind": "openai_compatible",
+            "base_url": "https://provider.example/v1",
+            "model": "remote-model",
+            "api_key_env_var": "MISSING_LLM_KEY",
+        })
+        provider_id = created.json()["provider"]["provider_id"]
+        tested = client.post(f"/api/v1/settings/llm/providers/{provider_id}/test")
+        assert tested.status_code == 200
+        assert tested.json()["healthy"] is False
+        assert client.put("/api/v1/settings/llm/active", json={"provider_id": provider_id}).status_code == 409
+
+    def test_provider_secret_never_returns(self, client):
+        created = client.post("/api/v1/settings/llm/providers", json={
+            "name": "Local secret test",
+            "kind": "local",
+            "base_url": "local://model",
+            "model": "demo-model",
+            "api_key_env_var": "LLM_API_KEY",
+        })
+        assert created.status_code == 200
+        assert created.json()["provider"]["api_key"] is None
+        listed = client.get("/api/v1/settings/llm/providers").json()["providers"]
+        assert all(item.get("api_key") is None for item in listed)
+
+
 class TestOperatorResources:
     def test_get_opportunities(self, client):
         resp = client.get("/api/v1/opportunities")

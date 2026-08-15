@@ -82,6 +82,29 @@ export function useUpdateWorkspaceSettings() {
   return useMutation({ mutationFn: api.updateWorkspaceSettings, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspaceSettings'] }) })
 }
 
+export function useLLMProviders() {
+  return useQuery({ queryKey: ['llmProviders'], queryFn: api.getLLMProviders })
+}
+
+export function useActiveLLMProvider() {
+  return useQuery({ queryKey: ['activeLLMProvider'], queryFn: api.getActiveLLMProvider })
+}
+
+export function useCreateLLMProvider() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: api.createLLMProvider, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['llmProviders'] }) })
+}
+
+export function useTestLLMProvider() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: api.testLLMProvider, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['llmProviders'] }) })
+}
+
+export function useSetActiveLLMProvider() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: api.setActiveLLMProvider, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['activeLLMProvider'] }); queryClient.invalidateQueries({ queryKey: ['llmProviders'] }) } })
+}
+
 export function useAuditExplain(id?: string) {
   return useQuery({
     queryKey: ['auditExplain', id],

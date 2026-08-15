@@ -4,9 +4,10 @@ import { ArrowRight, CheckCircle2, CircleAlert, Database, KeyRound, Link2, LockK
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { useApplicationSettings, useCompanies, usePolicyHistory, useResetApplicationSettings, useScope, useSetScope, useUpdateApplicationSettings, useUpdateWorkspaceSettings, useWorkspaceSettings } from "@/lib/api/hooks"
+import { useActiveLLMProvider, useApplicationSettings, useCompanies, useCreateLLMProvider, useLLMProviders, usePolicyHistory, useResetApplicationSettings, useScope, useSetActiveLLMProvider, useSetScope, useTestLLMProvider, useUpdateApplicationSettings, useUpdateWorkspaceSettings, useWorkspaceSettings } from "@/lib/api/hooks"
 
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) { return <div className={`loop-panel ${className}`}>{children}</div> }
+function Pill({ children, tone = "plain", dot = false }: { children: ReactNode; tone?: "plain" | "info" | "warn" | "ok"; dot?: boolean }) { return <span className={`loop-pill pill-${tone}`}>{dot && <span className="pill-dot" />}{children}</span> }
 
 type SettingsPage = "overview" | "llm" | "integrations" | "user" | "application" | "workspace" | "autonomy" | "data" | "security"
 
@@ -42,6 +43,11 @@ export function SettingsWorkspace({ status, mode, onMode, onPause, onStop, onRes
   const resetApplication = useResetApplicationSettings()
   const workspace = useWorkspaceSettings()
   const updateWorkspace = useUpdateWorkspaceSettings()
+  const llmProviders = useLLMProviders()
+  const activeLLM = useActiveLLMProvider()
+  const createLLM = useCreateLLMProvider()
+  const testLLM = useTestLLMProvider()
+  const setActiveLLM = useSetActiveLLMProvider()
 
   useEffect(() => { localStorage.setItem("loop.settings.page", page) }, [page])
 
@@ -54,27 +60,41 @@ export function SettingsWorkspace({ status, mode, onMode, onPause, onStop, onRes
     <div className="settings-shell">
       <nav className="settings-page-nav" aria-label="Settings pages">{pages.map((item) => { const Icon = item.icon; return <button key={item.id} className={page === item.id ? "settings-page-active" : ""} aria-current={page === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon size={15} /><span><strong>{item.label}</strong><small>{item.description}</small></span></button> })}</nav>
       <div className="settings-page-content">
-        {page === "overview" && <SettingsOverview status={status} mode={mode} policyHistory={policyHistory.data || []} scope={currentScope} onNavigate={navigate} />}
+        {page === "overview" && <SettingsOverview status={status} mode={mode} policyHistory={policyHistory.data || []} scope={currentScope} activeProvider={activeLLM.data?.provider} onNavigate={navigate} />}
         {page === "autonomy" && <AutonomyPage status={status} mode={mode} scope={currentScope} segments={segments} loading={scope.isLoading || companies.isLoading} onMode={onMode} onPause={onPause} onStop={onStop} onResume={onResume} onSave={(patch) => setScope.mutate(patch)} />}
+        {page === "llm" && <LLMPage providers={llmProviders} active={activeLLM} create={createLLM} test={testLLM} setActive={setActiveLLM} />}
         {page === "application" && <ApplicationPage query={application} update={updateApplication} reset={resetApplication} />}
         {page === "workspace" && <WorkspacePage query={workspace} update={updateWorkspace} segments={segments} />}
-        {page !== "overview" && page !== "autonomy" && page !== "application" && page !== "workspace" && <ConfigurationPlaceholder page={page} />}
+        {page !== "overview" && page !== "autonomy" && page !== "llm" && page !== "application" && page !== "workspace" && <ConfigurationPlaceholder page={page} />}
       </div>
     </div>
   </div>
 }
 
-function SettingsOverview({ status, mode, policyHistory, scope, onNavigate }: { status?: SettingsWorkspaceProps["status"]; mode: string; policyHistory: Array<{ version: number; source: string; created_at: string }>; scope?: { enabled: boolean; allowed_channels: string[]; allowed_segments: string[]; max_sends_per_day: number }; onNavigate: (page: SettingsPage) => void }) {
+function SettingsOverview({ status, mode, policyHistory, scope, activeProvider, onNavigate }: { status?: SettingsWorkspaceProps["status"]; mode: string; policyHistory: Array<{ version: number; source: string; created_at: string }>; scope?: { enabled: boolean; allowed_channels: string[]; allowed_segments: string[]; max_sends_per_day: number }; activeProvider?: { name: string; model: string; api_key_configured: boolean } | null; onNavigate: (page: SettingsPage) => void }) {
   return <div className="settings-overview">
     <div className="settings-overview-grid">
       <OverviewCard title="Operating mode" value={mode} detail={scope ? `${scope.max_sends_per_day} actions/day scope` : "Scope is loading"} tone={mode === "autopilot" ? "info" : "plain"} icon={<ShieldCheck size={17} />} onClick={() => onNavigate("autonomy")} />
-      <OverviewCard title="LLM provider" value="Not configured" detail="No provider status endpoint is connected" tone="warn" icon={<KeyRound size={17} />} onClick={() => onNavigate("llm")} />
+      <OverviewCard title="LLM provider" value={activeProvider?.name || "Not configured"} detail={activeProvider ? `${activeProvider.model} · secret ${activeProvider.api_key_configured ? "configured" : "missing"}` : "No active provider"} tone={activeProvider?.api_key_configured ? "info" : "warn"} icon={<KeyRound size={17} />} onClick={() => onNavigate("llm")} />
       <OverviewCard title="Integrations" value={status?.simulation_mode ? "Simulation mode" : "Configuration unavailable"} detail={status?.simulation_mode ? "External sends are disabled" : "Connection health is not available"} tone={status?.simulation_mode ? "info" : "warn"} icon={<Link2 size={17} />} onClick={() => onNavigate("integrations")} />
       <OverviewCard title="Budget today" value={`${status?.today_budget_used ?? 0} units`} detail="Live from system status" tone="plain" icon={<SlidersHorizontal size={17} />} onClick={() => onNavigate("autonomy")} />
     </div>
     <section className="settings-overview-section"><div className="section-heading"><h2>Workspace configuration</h2><span className="mono">backend-backed</span></div><div className="settings-summary-list"><SummaryRow label="Workspace scope" value={scope ? `${scope.allowed_segments.length} segments · ${scope.allowed_channels.length} channels` : "Loading"} onClick={() => onNavigate("autonomy")} /><SummaryRow label="Simulation safety" value={status?.simulation_mode ? "Enabled" : "Unavailable"} onClick={() => onNavigate("data")} /><SummaryRow label="Policy history" value={`${policyHistory.length} version${policyHistory.length === 1 ? "" : "s"}`} onClick={() => onNavigate("autonomy")} /><SummaryRow label="User preferences" value="Not configured" onClick={() => onNavigate("user")} /></div></section>
     <section className="settings-overview-section"><div className="section-heading"><h2>Recent configuration changes</h2><span className="mono">{policyHistory.length} policy events</span></div>{policyHistory.length ? <div className="settings-change-list">{policyHistory.slice(-5).reverse().map((item) => <div key={item.version} className="settings-change"><span className="mono">v{item.version}</span><span><strong>{item.source}</strong><small>{item.created_at}</small></span></div>)}</div> : <div className="settings-empty"><CircleAlert size={17} /><span>No configuration changes recorded yet.</span></div>}</section>
   </div>
+}
+
+function LLMPage({ providers, active, create, test, setActive }: { providers: ReturnType<typeof useLLMProviders>; active: ReturnType<typeof useActiveLLMProvider>; create: ReturnType<typeof useCreateLLMProvider>; test: ReturnType<typeof useTestLLMProvider>; setActive: ReturnType<typeof useSetActiveLLMProvider> }) {
+  const [name, setName] = useState("")
+  const [kind, setKind] = useState("openai_compatible")
+  const [baseUrl, setBaseUrl] = useState("")
+  const [model, setModel] = useState("")
+  const [envVar, setEnvVar] = useState("LLM_API_KEY")
+  const items = providers.data?.providers || []
+  const submit = () => { if (!name || !baseUrl || !model) return; create.mutate({ name, kind: kind as "openai_compatible", base_url: baseUrl, model, api_key_env_var: envVar, timeout_seconds: 30, retry_count: 2, capabilities: { chat: true }, enabled: true }, { onSuccess: () => { setName(""); setBaseUrl(""); setModel("") } }) }
+  if (providers.isLoading || active.isLoading) return <Panel className="query-state"><span className="state-spinner" /><p>Loading LLM provider configuration...</p></Panel>
+  if (providers.error || active.error) return <Panel className="query-state query-error"><CircleAlert size={20} /><strong>LLM provider configuration unavailable</strong><p>{providers.error?.message || active.error?.message}</p><Button variant="outline" className="small-button" onClick={() => void providers.refetch()}>Retry</Button></Panel>
+  return <div className="settings-sections"><Panel className="settings-secret-note"><KeyRound size={16} /><span>Provider metadata is persisted. API keys are never stored or returned; configure the named environment variable in the server runtime.</span></Panel><SettingSection title="Active provider"><div className="setting-row"><span><strong>{active.data?.provider?.name || "No active provider"}</strong><small>{active.data?.provider ? `${active.data.provider.model} · ${active.data.provider.api_key_configured ? "secret configured" : "secret missing"}` : "Create and validate a provider before activation."}</small></span>{active.data?.provider && <Pill tone={active.data.provider.api_key_configured ? "ok" : "warn"} dot>{active.data.provider.api_key_configured ? "ready" : "incomplete"}</Pill>}</div></SettingSection><SettingSection title="Configured providers">{items.length ? items.map((provider) => <div className="setting-row" key={provider.provider_id}><span><strong>{provider.name}</strong><small>{provider.kind} · {provider.model} · {provider.base_url}</small></span><div className="llm-provider-actions"><Pill tone={provider.last_test?.healthy ? "ok" : provider.api_key_configured ? "plain" : "warn"} dot>{provider.last_test?.healthy ? "healthy" : provider.api_key_configured ? "untested" : "missing secret"}</Pill><Button variant="outline" className="small-button" onClick={() => test.mutate(provider.provider_id)}>Test</Button><Button className="teal-button small-button" onClick={() => setActive.mutate(provider.provider_id)} disabled={!provider.enabled || !provider.api_key_configured}>Use provider</Button></div></div>) : <p className="empty-copy">No providers are configured.</p>}</SettingSection><SettingSection title="Add provider"><div className="settings-form-grid"><label>Name<Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Provider name" /></label><label>Kind<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="openai_compatible">OpenAI-compatible</option><option value="anthropic_compatible">Anthropic-compatible</option><option value="local">Local</option><option value="custom">Custom</option></select></label><label>Base URL<Input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://provider.example/v1" /></label><label>Model<Input value={model} onChange={(event) => setModel(event.target.value)} placeholder="model-name" /></label><label>API key environment variable<Input value={envVar} onChange={(event) => setEnvVar(event.target.value)} placeholder="LLM_API_KEY" /></label></div><Button className="teal-button" onClick={submit} disabled={create.isPending || !name || !baseUrl || !model}>Add provider</Button></SettingSection></div>
 }
 
 function OverviewCard({ title, value, detail, tone, icon, onClick }: { title: string; value: string; detail: string; tone: "plain" | "info" | "warn"; icon: ReactNode; onClick: () => void }) {

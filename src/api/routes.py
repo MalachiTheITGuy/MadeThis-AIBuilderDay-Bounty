@@ -15,14 +15,17 @@ Routes:
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..domain.enums import ActionStatus, Actor, Mode, OpportunityStatus, OutcomeResult
 from ..domain.models import Outcome
+from ..config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 from .auth import require_api_key
 from ..engine.permission import (
     AUTOPILOT_DEFAULT_SCOPE,
@@ -1036,6 +1039,34 @@ class WorkspaceSettingsUpdate(BaseModel):
     default_segment: str | None = Field(default=None, max_length=120)
 
 
+class LLMProviderUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    kind: Literal["openai_compatible", "anthropic_compatible", "local", "custom"] = "openai_compatible"
+    base_url: str = Field(min_length=1, max_length=500)
+    model: str = Field(min_length=1, max_length=200)
+    api_key_env_var: str | None = Field(default=None, max_length=120)
+    timeout_seconds: int = Field(default=30, ge=1, le=120)
+    retry_count: int = Field(default=2, ge=0, le=5)
+    capabilities: dict[str, bool] = Field(default_factory=dict)
+    enabled: bool = True
+
+
+class LLMProviderPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    kind: Literal["openai_compatible", "anthropic_compatible", "local", "custom"] | None = None
+    base_url: str | None = Field(default=None, min_length=1, max_length=500)
+    model: str | None = Field(default=None, min_length=1, max_length=200)
+    api_key_env_var: str | None = Field(default=None, max_length=120)
+    timeout_seconds: int | None = Field(default=None, ge=1, le=120)
+    retry_count: int | None = Field(default=None, ge=0, le=5)
+    capabilities: dict[str, bool] | None = None
+    enabled: bool | None = None
+
+
+class LLMActiveUpdate(BaseModel):
+    provider_id: str = Field(min_length=1, max_length=120)
+
+
 def _get_scope() -> dict:
     conn = connect()
     try:
@@ -1153,6 +1184,172 @@ def update_workspace_settings(req: WorkspaceSettingsUpdate) -> dict:
         _write_settings(conn, "settings.workspace", "settings.workspace", settings, "workspace_settings_update")
         conn.commit()
         return {"settings": settings}
+    finally:
+        conn.close()
+
+
+def _llm_providers(conn) -> list[dict]:
+    row = conn.execute("SELECT value FROM memory_kv WHERE key = 'settings.llm.providers'").fetchone()
+    if row:
+        try:
+            value = json.loads(row["value"])
+            if isinstance(value, list):
+                return value
+        except (TypeError, ValueError):
+            pass
+    if LLM_BASE_URL and LLM_MODEL:
+        return [{
+            "provider_id": "env-default",
+            "name": "Environment provider",
+            "kind": "openai_compatible",
+            "base_url": LLM_BASE_URL,
+            "model": LLM_MODEL,
+            "api_key_env_var": "LLM_API_KEY",
+            "timeout_seconds": 30,
+            "retry_count": 2,
+            "capabilities": {"chat": True},
+            "enabled": True,
+            "source": "environment",
+        }]
+    return []
+
+
+def _llm_provider_response(provider: dict) -> dict:
+    """Return provider metadata without ever returning a credential value."""
+    env_var = provider.get("api_key_env_var")
+    configured = provider.get("kind") == "local" or bool(env_var and os.environ.get(env_var))
+    return {
+        **provider,
+        "api_key_configured": configured,
+        "secret_source": env_var or ("none" if provider.get("kind") != "local" else "local"),
+        "api_key": None,
+    }
+
+
+def _llm_provider_health(provider: dict) -> tuple[bool, str]:
+    parsed = urlparse(provider.get("base_url", ""))
+    if parsed.scheme not in {"http", "https"} and provider.get("kind") != "local":
+        return False, "base_url must use http or https"
+    env_var = provider.get("api_key_env_var")
+    if provider.get("kind") != "local" and not (env_var and os.environ.get(env_var)):
+        return False, f"secret environment variable {env_var or 'not configured'} is not set"
+    return True, "configuration is valid; no generation request was made"
+
+
+def _save_llm_providers(conn, providers: list[dict], event: str, provider_id: str | None = None) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO memory_kv (key, namespace, value, updated_at) VALUES "
+        "('settings.llm.providers', 'settings.llm', ?, datetime('now'))",
+        (json.dumps(providers),),
+    )
+    log_activity(conn, Actor.USER.value, None, event, status="UPDATED", detail=json.dumps({"provider_id": provider_id} if provider_id else {}))
+
+
+@router.get("/settings/llm/providers")
+def get_llm_providers() -> dict:
+    conn = connect()
+    try:
+        return {"providers": [_llm_provider_response(provider) for provider in _llm_providers(conn)]}
+    finally:
+        conn.close()
+
+
+@router.post("/settings/llm/providers")
+def create_llm_provider(req: LLMProviderUpdate) -> dict:
+    conn = connect()
+    try:
+        provider = req.model_dump()
+        provider["provider_id"] = f"llm-{uuid.uuid4().hex[:10]}"
+        provider["source"] = "settings"
+        provider["last_test"] = None
+        providers = _llm_providers(conn)
+        providers.append(provider)
+        _save_llm_providers(conn, providers, "llm_provider_created", provider["provider_id"])
+        conn.commit()
+        return {"provider": _llm_provider_response(provider)}
+    finally:
+        conn.close()
+
+
+@router.patch("/settings/llm/providers/{provider_id}")
+def update_llm_provider(provider_id: str, req: LLMProviderPatch) -> dict:
+    conn = connect()
+    try:
+        providers = _llm_providers(conn)
+        provider = next((item for item in providers if item.get("provider_id") == provider_id), None)
+        if not provider:
+            raise HTTPException(status_code=404, detail=f"LLM provider not found: {provider_id}")
+        provider.update(req.model_dump(exclude_none=True))
+        _save_llm_providers(conn, providers, "llm_provider_updated", provider_id)
+        conn.commit()
+        return {"provider": _llm_provider_response(provider)}
+    finally:
+        conn.close()
+
+
+@router.delete("/settings/llm/providers/{provider_id}")
+def delete_llm_provider(provider_id: str) -> dict:
+    conn = connect()
+    try:
+        providers = _llm_providers(conn)
+        if not any(item.get("provider_id") == provider_id for item in providers):
+            raise HTTPException(status_code=404, detail=f"LLM provider not found: {provider_id}")
+        active = conn.execute("SELECT value FROM memory_kv WHERE key = 'settings.llm.active'").fetchone()
+        if active and active["value"] == provider_id:
+            raise HTTPException(status_code=409, detail="Cannot delete the active LLM provider")
+        providers = [item for item in providers if item.get("provider_id") != provider_id]
+        _save_llm_providers(conn, providers, "llm_provider_deleted", provider_id)
+        conn.commit()
+        return {"provider_id": provider_id, "deleted": True}
+    finally:
+        conn.close()
+
+
+@router.post("/settings/llm/providers/{provider_id}/test")
+def test_llm_provider(provider_id: str) -> dict:
+    conn = connect()
+    try:
+        providers = _llm_providers(conn)
+        provider = next((item for item in providers if item.get("provider_id") == provider_id), None)
+        if not provider:
+            raise HTTPException(status_code=404, detail=f"LLM provider not found: {provider_id}")
+        healthy, detail = _llm_provider_health(provider)
+        provider["last_test"] = {"healthy": healthy, "detail": detail}
+        _save_llm_providers(conn, providers, "llm_provider_tested", provider_id)
+        conn.commit()
+        return {"provider_id": provider_id, "healthy": healthy, "detail": detail}
+    finally:
+        conn.close()
+
+
+@router.get("/settings/llm/active")
+def get_active_llm_provider() -> dict:
+    conn = connect()
+    try:
+        active = conn.execute("SELECT value FROM memory_kv WHERE key = 'settings.llm.active'").fetchone()
+        providers = _llm_providers(conn)
+        provider = next((item for item in providers if item.get("provider_id") == (active["value"] if active else None)), None)
+        return {"provider": _llm_provider_response(provider) if provider else None}
+    finally:
+        conn.close()
+
+
+@router.put("/settings/llm/active")
+def set_active_llm_provider(req: LLMActiveUpdate) -> dict:
+    conn = connect()
+    try:
+        provider = next((item for item in _llm_providers(conn) if item.get("provider_id") == req.provider_id), None)
+        if not provider:
+            raise HTTPException(status_code=404, detail=f"LLM provider not found: {req.provider_id}")
+        if not provider.get("enabled", True):
+            raise HTTPException(status_code=409, detail="Cannot activate a disabled LLM provider")
+        healthy, detail = _llm_provider_health(provider)
+        if not healthy:
+            raise HTTPException(status_code=409, detail=detail)
+        conn.execute("INSERT OR REPLACE INTO memory_kv (key, namespace, value, updated_at) VALUES ('settings.llm.active', 'settings.llm', ?, datetime('now'))", (req.provider_id,))
+        log_activity(conn, Actor.USER.value, None, "llm_provider_activated", status="UPDATED", detail=json.dumps({"provider_id": req.provider_id}))
+        conn.commit()
+        return {"provider": _llm_provider_response(provider)}
     finally:
         conn.close()
 

@@ -289,6 +289,23 @@ export interface WorkspaceSettings {
   default_segment: string
 }
 
+export interface LLMProvider {
+  provider_id: string
+  name: string
+  kind: 'openai_compatible' | 'anthropic_compatible' | 'local' | 'custom'
+  base_url: string
+  model: string
+  api_key_env_var?: string | null
+  api_key_configured: boolean
+  secret_source: string
+  timeout_seconds: number
+  retry_count: number
+  capabilities: Record<string, boolean>
+  enabled: boolean
+  source?: string
+  last_test?: { healthy: boolean; detail: string } | null
+}
+
 // API Client
 const API_BASE = '/api/v1'
 
@@ -331,6 +348,11 @@ export const api = {
   resetApplicationSettings: () => fetchApi<{ settings: ApplicationSettings; reset: boolean }>('/settings/application/reset', { method: 'POST' }),
   getWorkspaceSettings: () => fetchApi<{ settings: WorkspaceSettings }>('/settings/workspace'),
   updateWorkspaceSettings: (settings: Partial<WorkspaceSettings>) => fetchApi<{ settings: WorkspaceSettings }>('/settings/workspace', { method: 'PATCH', body: JSON.stringify(settings) }),
+  getLLMProviders: () => fetchApi<{ providers: LLMProvider[] }>('/settings/llm/providers'),
+  createLLMProvider: (provider: Omit<LLMProvider, 'provider_id' | 'api_key_configured' | 'secret_source' | 'source' | 'last_test'> & { api_key_env_var?: string }) => fetchApi<{ provider: LLMProvider }>('/settings/llm/providers', { method: 'POST', body: JSON.stringify(provider) }),
+  testLLMProvider: (providerId: string) => fetchApi<{ provider_id: string; healthy: boolean; detail: string }>(`/settings/llm/providers/${providerId}/test`, { method: 'POST' }),
+  getActiveLLMProvider: () => fetchApi<{ provider: LLMProvider | null }>('/settings/llm/active'),
+  setActiveLLMProvider: (providerId: string) => fetchApi<{ provider: LLMProvider }>(`/settings/llm/active`, { method: 'PUT', body: JSON.stringify({ provider_id: providerId }) }),
   getAuditExplain: (id: string) => fetchApi<Record<string, unknown>>(`/audit/explain/${id}`),
   pause: () => fetchApi<void>('/control/pause', { method: 'POST' }),
   stop: () => fetchApi<void>('/control/stop', { method: 'POST' }),
