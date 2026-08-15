@@ -231,6 +231,12 @@ export interface DecisionCard {
   expected_effect: string
 }
 
+export interface DecisionMutationResponse {
+  status: string
+  action_id: string
+  reason?: string
+}
+
 export interface ActionTimeline {
   action_id: string
   status: string
@@ -312,12 +318,12 @@ export const api = {
 
   // Queue
   getQueue: () => fetchApi<Action[]>('/queue'),
-  approveAction: (id: string, note?: string) => 
-    fetchApi<Action>(`/decisions/${id}/approve`, { method: 'POST', body: JSON.stringify({ note }) }),
-  rejectAction: (id: string, reason: string) => 
-    fetchApi<Action>(`/decisions/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  approveAction: (id: string, note?: string) =>
+    fetchApi<DecisionMutationResponse>(`/decisions/${id}/approve`, { method: 'POST', body: JSON.stringify(note ? { note } : {}) }),
+  rejectAction: (id: string, reason: string) =>
+    fetchApi<DecisionMutationResponse>(`/decisions/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
   editAction: (id: string, changes: { subject?: string; body?: string }, note?: string) => 
-    fetchApi<Action>(`/decisions/${id}/edit`, { method: 'POST', body: JSON.stringify({ ...changes, note }) }),
+    fetchApi<DecisionMutationResponse>(`/decisions/${id}/edit`, { method: 'POST', body: JSON.stringify({ ...changes, note }) }),
 
   // Activity
   getActivity: (params?: { limit?: number; offset?: number; filter?: string }) => {

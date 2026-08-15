@@ -125,6 +125,8 @@ export function useApproveAction() {
       queryClient.invalidateQueries({ queryKey: ['activity'] })
       queryClient.invalidateQueries({ queryKey: ['systemStatus'] })
       queryClient.invalidateQueries({ queryKey: ['pipeline'] })
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] })
+      queryClient.invalidateQueries({ queryKey: ['decision'] })
     },
   })
 }
@@ -137,6 +139,8 @@ export function useRejectAction() {
       queryClient.invalidateQueries({ queryKey: ['queue'] })
       queryClient.invalidateQueries({ queryKey: ['activity'] })
       queryClient.invalidateQueries({ queryKey: ['systemStatus'] })
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] })
+      queryClient.invalidateQueries({ queryKey: ['decision'] })
     },
   })
 }
