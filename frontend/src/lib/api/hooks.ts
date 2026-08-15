@@ -59,6 +59,29 @@ export function useSetScope() {
   return useMutation({ mutationFn: api.setScope, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scope'] }) })
 }
 
+export function useApplicationSettings() {
+  return useQuery({ queryKey: ['applicationSettings'], queryFn: api.getApplicationSettings })
+}
+
+export function useUpdateApplicationSettings() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: api.updateApplicationSettings, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['applicationSettings'] }) })
+}
+
+export function useResetApplicationSettings() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: api.resetApplicationSettings, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['applicationSettings'] }) })
+}
+
+export function useWorkspaceSettings() {
+  return useQuery({ queryKey: ['workspaceSettings'], queryFn: api.getWorkspaceSettings })
+}
+
+export function useUpdateWorkspaceSettings() {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: api.updateWorkspaceSettings, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspaceSettings'] }) })
+}
+
 export function useAuditExplain(id?: string) {
   return useQuery({
     queryKey: ['auditExplain', id],

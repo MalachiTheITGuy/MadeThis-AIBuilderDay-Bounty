@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..domain.enums import ActionStatus, Actor, Mode, OpportunityStatus, OutcomeResult
 from ..domain.models import Outcome
@@ -1017,6 +1017,25 @@ class ScopeRequest(BaseModel):
     max_cost_units_per_action: int | None = None
 
 
+class ApplicationSettingsUpdate(BaseModel):
+    theme: Literal["system", "light", "dark"] | None = None
+    density: Literal["comfortable", "compact"] | None = None
+    date_format: Literal["locale", "iso"] | None = None
+    time_format: Literal["12h", "24h"] | None = None
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    refresh_interval_seconds: int | None = Field(default=None, ge=5, le=3600)
+    default_landing_page: Literal["today", "opportunities", "approvals", "activity"] | None = None
+    default_opportunity_sort: Literal["score", "recency", "value"] | None = None
+    feature_flags: dict[str, bool] | None = None
+
+
+class WorkspaceSettingsUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    timezone: str | None = Field(default=None, min_length=1, max_length=80)
+    default_currency: str | None = Field(default=None, min_length=3, max_length=3)
+    default_segment: str | None = Field(default=None, max_length=120)
+
+
 def _get_scope() -> dict:
     conn = connect()
     try:
@@ -1028,6 +1047,114 @@ def _get_scope() -> dict:
     finally:
         conn.close()
     return dict(AUTOPILOT_DEFAULT_SCOPE)
+
+
+_APPLICATION_SETTINGS_DEFAULTS = {
+    "theme": "system",
+    "density": "comfortable",
+    "date_format": "locale",
+    "time_format": "12h",
+    "currency": "USD",
+    "refresh_interval_seconds": 10,
+    "default_landing_page": "today",
+    "default_opportunity_sort": "score",
+    "feature_flags": {},
+}
+
+_WORKSPACE_SETTINGS_DEFAULTS = {
+    "name": "",
+    "timezone": "UTC",
+    "default_currency": "USD",
+    "default_segment": "",
+}
+
+
+def _read_settings(conn, key: str, defaults: dict) -> dict:
+    row = conn.execute("SELECT value FROM memory_kv WHERE key = ?", (key,)).fetchone()
+    if not row:
+        return dict(defaults)
+    try:
+        value = json.loads(row["value"])
+    except (TypeError, ValueError):
+        return dict(defaults)
+    return {**defaults, **value} if isinstance(value, dict) else dict(defaults)
+
+
+def _write_settings(conn, key: str, namespace: str, settings: dict, event: str) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO memory_kv (key, namespace, value, updated_at) "
+        "VALUES (?, ?, ?, datetime('now'))",
+        (key, namespace, json.dumps(settings)),
+    )
+    log_activity(
+        conn,
+        Actor.USER.value,
+        None,
+        event,
+        status="UPDATED",
+        detail=json.dumps({"resource": key, "fields": sorted(settings)}),
+    )
+
+
+@router.get("/settings/application")
+def get_application_settings() -> dict:
+    """Return persisted application/UI preferences."""
+    conn = connect()
+    try:
+        return {"settings": _read_settings(conn, "settings.application", _APPLICATION_SETTINGS_DEFAULTS)}
+    finally:
+        conn.close()
+
+
+@router.patch("/settings/application")
+def update_application_settings(req: ApplicationSettingsUpdate) -> dict:
+    """Validate and persist application/UI preferences without touching domain data."""
+    conn = connect()
+    try:
+        settings = _read_settings(conn, "settings.application", _APPLICATION_SETTINGS_DEFAULTS)
+        settings.update(req.model_dump(exclude_none=True))
+        _write_settings(conn, "settings.application", "settings.application", settings, "application_settings_update")
+        conn.commit()
+        return {"settings": settings}
+    finally:
+        conn.close()
+
+
+@router.post("/settings/application/reset")
+def reset_application_settings() -> dict:
+    """Reset only application preferences; domain data and credentials are untouched."""
+    conn = connect()
+    try:
+        settings = dict(_APPLICATION_SETTINGS_DEFAULTS)
+        _write_settings(conn, "settings.application", "settings.application", settings, "application_settings_reset")
+        conn.commit()
+        return {"settings": settings, "reset": True}
+    finally:
+        conn.close()
+
+
+@router.get("/settings/workspace")
+def get_workspace_settings() -> dict:
+    """Return persisted workspace preferences."""
+    conn = connect()
+    try:
+        return {"settings": _read_settings(conn, "settings.workspace", _WORKSPACE_SETTINGS_DEFAULTS)}
+    finally:
+        conn.close()
+
+
+@router.patch("/settings/workspace")
+def update_workspace_settings(req: WorkspaceSettingsUpdate) -> dict:
+    """Validate and persist workspace preferences."""
+    conn = connect()
+    try:
+        settings = _read_settings(conn, "settings.workspace", _WORKSPACE_SETTINGS_DEFAULTS)
+        settings.update(req.model_dump(exclude_none=True))
+        _write_settings(conn, "settings.workspace", "settings.workspace", settings, "workspace_settings_update")
+        conn.commit()
+        return {"settings": settings}
+    finally:
+        conn.close()
 
 
 def _save_scope(scope: dict) -> None:

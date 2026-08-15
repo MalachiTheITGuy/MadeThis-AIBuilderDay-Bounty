@@ -240,6 +240,51 @@ class TestControlScope:
         assert resp.json()["scope"]["allowed_segments"] == ["saas-b2b"]
 
 
+class TestSettingsPreferences:
+    def test_application_settings_defaults_and_update(self, client):
+        initial = client.get("/api/v1/settings/application")
+        assert initial.status_code == 200
+        assert initial.json()["settings"]["theme"] == "system"
+
+        updated = client.patch("/api/v1/settings/application", json={
+            "theme": "dark",
+            "density": "compact",
+            "refresh_interval_seconds": 30,
+        })
+        assert updated.status_code == 200
+        assert updated.json()["settings"]["theme"] == "dark"
+        assert client.get("/api/v1/settings/application").json()["settings"]["density"] == "compact"
+
+    def test_application_reset_only_resets_preferences(self, client):
+        client.patch("/api/v1/settings/application", json={"theme": "dark"})
+        reset = client.post("/api/v1/settings/application/reset")
+        assert reset.status_code == 200
+        assert reset.json()["reset"] is True
+        assert reset.json()["settings"]["theme"] == "system"
+        assert client.get("/api/v1/companies").json()
+
+    def test_application_validation(self, client):
+        resp = client.patch("/api/v1/settings/application", json={"refresh_interval_seconds": 2})
+        assert resp.status_code == 422
+
+    def test_workspace_settings_persist(self, client):
+        updated = client.patch("/api/v1/settings/workspace", json={
+            "name": "Growth workspace",
+            "timezone": "America/Denver",
+            "default_currency": "USD",
+        })
+        assert updated.status_code == 200
+        settings = client.get("/api/v1/settings/workspace").json()["settings"]
+        assert settings["name"] == "Growth workspace"
+        assert settings["timezone"] == "America/Denver"
+
+    def test_settings_changes_are_audited(self, client):
+        client.patch("/api/v1/settings/workspace", json={"name": "Audited workspace"})
+        events = client.get("/api/v1/activity", params={"event": "workspace_settings_update"}).json()
+        assert events
+        assert events[0]["detail"]
+
+
 class TestOperatorResources:
     def test_get_opportunities(self, client):
         resp = client.get("/api/v1/opportunities")

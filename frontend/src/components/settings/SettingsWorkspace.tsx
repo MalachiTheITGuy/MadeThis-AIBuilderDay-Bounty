@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react"
 import type { ReactNode } from "react"
-import { ArrowRight, CircleAlert, Database, KeyRound, Link2, LockKeyhole, Pause, Play, Settings2, ShieldCheck, SlidersHorizontal, StopCircle, UserRound } from "lucide-react"
+import { ArrowRight, CheckCircle2, CircleAlert, Database, KeyRound, Link2, LockKeyhole, Pause, Play, Settings2, ShieldCheck, SlidersHorizontal, StopCircle, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { useCompanies, usePolicyHistory, useScope, useSetScope } from "@/lib/api/hooks"
+import { useApplicationSettings, useCompanies, usePolicyHistory, useResetApplicationSettings, useScope, useSetScope, useUpdateApplicationSettings, useUpdateWorkspaceSettings, useWorkspaceSettings } from "@/lib/api/hooks"
 
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) { return <div className={`loop-panel ${className}`}>{children}</div> }
 
-type SettingsPage = "overview" | "llm" | "integrations" | "user" | "application" | "autonomy" | "data" | "security"
+type SettingsPage = "overview" | "llm" | "integrations" | "user" | "application" | "workspace" | "autonomy" | "data" | "security"
 
 const pages: Array<{ id: SettingsPage; label: string; description: string; icon: typeof Settings2 }> = [
   { id: "overview", label: "Overview", description: "Workspace configuration", icon: Settings2 },
@@ -16,6 +16,7 @@ const pages: Array<{ id: SettingsPage; label: string; description: string; icon:
   { id: "integrations", label: "Integrations", description: "Channels and external systems", icon: Link2 },
   { id: "user", label: "User settings", description: "Profile and notifications", icon: UserRound },
   { id: "application", label: "Application", description: "Display and behavior", icon: SlidersHorizontal },
+  { id: "workspace", label: "Workspace", description: "Workspace defaults", icon: Settings2 },
   { id: "autonomy", label: "Autonomy & guardrails", description: "What Loop may do", icon: ShieldCheck },
   { id: "data", label: "Data & simulation", description: "Privacy and data handling", icon: Database },
   { id: "security", label: "Security & access", description: "Secrets and audit", icon: LockKeyhole },
@@ -36,6 +37,11 @@ export function SettingsWorkspace({ status, mode, onMode, onPause, onStop, onRes
   const companies = useCompanies()
   const policyHistory = usePolicyHistory()
   const setScope = useSetScope()
+  const application = useApplicationSettings()
+  const updateApplication = useUpdateApplicationSettings()
+  const resetApplication = useResetApplicationSettings()
+  const workspace = useWorkspaceSettings()
+  const updateWorkspace = useUpdateWorkspaceSettings()
 
   useEffect(() => { localStorage.setItem("loop.settings.page", page) }, [page])
 
@@ -50,7 +56,9 @@ export function SettingsWorkspace({ status, mode, onMode, onPause, onStop, onRes
       <div className="settings-page-content">
         {page === "overview" && <SettingsOverview status={status} mode={mode} policyHistory={policyHistory.data || []} scope={currentScope} onNavigate={navigate} />}
         {page === "autonomy" && <AutonomyPage status={status} mode={mode} scope={currentScope} segments={segments} loading={scope.isLoading || companies.isLoading} onMode={onMode} onPause={onPause} onStop={onStop} onResume={onResume} onSave={(patch) => setScope.mutate(patch)} />}
-        {page !== "overview" && page !== "autonomy" && <ConfigurationPlaceholder page={page} />}
+        {page === "application" && <ApplicationPage query={application} update={updateApplication} reset={resetApplication} />}
+        {page === "workspace" && <WorkspacePage query={workspace} update={updateWorkspace} segments={segments} />}
+        {page !== "overview" && page !== "autonomy" && page !== "application" && page !== "workspace" && <ConfigurationPlaceholder page={page} />}
       </div>
     </div>
   </div>
@@ -80,6 +88,20 @@ function SummaryRow({ label, value, onClick }: { label: string; value: string; o
 function ConfigurationPlaceholder({ page }: { page: SettingsPage }) {
   const meta = pages.find((item) => item.id === page)
   return <Panel className="settings-placeholder"><div className="settings-placeholder-icon"><InfoIcon page={page} /></div><span className="eyebrow">{meta?.label}</span><h2>{meta?.description}</h2><p>This settings surface is ready for its backend configuration contract. It will not display fabricated connection or profile state.</p><div className="placeholder-status"><CircleAlert size={15} /><span>Backend configuration endpoint not available yet</span></div></Panel>
+}
+
+function ApplicationPage({ query, update, reset }: { query: ReturnType<typeof useApplicationSettings>; update: ReturnType<typeof useUpdateApplicationSettings>; reset: ReturnType<typeof useResetApplicationSettings> }) {
+  const settings = query.data?.settings
+  if (query.isLoading) return <Panel className="query-state"><span className="state-spinner" /><p>Loading application preferences...</p></Panel>
+  if (query.error || !settings) return <Panel className="query-state query-error"><CircleAlert size={20} /><strong>Application preferences unavailable</strong><p>{query.error?.message || "The backend did not return settings."}</p><Button variant="outline" className="small-button" onClick={() => void query.refetch()}>Retry</Button></Panel>
+  return <div className="settings-sections"><SettingSection title="Appearance"><div className="setting-row"><span><strong>Theme</strong><small>Stored as an application preference</small></span><select value={settings.theme} onChange={(event) => update.mutate({ theme: event.target.value as typeof settings.theme })}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div><div className="setting-row"><span><strong>Density</strong><small>How much information appears in a workspace</small></span><select value={settings.density} onChange={(event) => update.mutate({ density: event.target.value as typeof settings.density })}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div></SettingSection><SettingSection title="Formatting"><div className="setting-row"><span><strong>Time format</strong><small>Used in activity and schedules</small></span><select value={settings.time_format} onChange={(event) => update.mutate({ time_format: event.target.value as typeof settings.time_format })}><option value="12h">12 hour</option><option value="24h">24 hour</option></select></div><div className="setting-row"><span><strong>Currency</strong><small>Used for simulated ARR</small></span><Input className="scope-number" maxLength={3} value={settings.currency} onChange={(event) => update.mutate({ currency: event.target.value.toUpperCase() })} /></div></SettingSection><SettingSection title="Workspace behavior"><div className="setting-row"><span><strong>Refresh interval</strong><small>Minimum 5 seconds</small></span><Input className="scope-number" type="number" min={5} max={3600} value={settings.refresh_interval_seconds} onChange={(event) => update.mutate({ refresh_interval_seconds: Number(event.target.value) })} /></div><div className="setting-row"><span><strong>Default landing page</strong><small>Where the app opens after sign-in</small></span><select value={settings.default_landing_page} onChange={(event) => update.mutate({ default_landing_page: event.target.value as typeof settings.default_landing_page })}><option value="today">Today</option><option value="opportunities">Opportunities</option><option value="approvals">Approvals</option><option value="activity">Activity</option></select></div><div className="setting-row"><span><strong>Default opportunity sort</strong><small>Initial queue ordering</small></span><select value={settings.default_opportunity_sort} onChange={(event) => update.mutate({ default_opportunity_sort: event.target.value as typeof settings.default_opportunity_sort })}><option value="score">Next-best score</option><option value="recency">Signal recency</option><option value="value">Expected value</option></select></div></SettingSection><div className="settings-action-row"><Button variant="outline" onClick={() => reset.mutate()}>Reset application preferences</Button><span className="mono">Only UI preferences are reset.</span></div></div>
+}
+
+function WorkspacePage({ query, update, segments }: { query: ReturnType<typeof useWorkspaceSettings>; update: ReturnType<typeof useUpdateWorkspaceSettings>; segments: string[] }) {
+  const settings = query.data?.settings
+  if (query.isLoading) return <Panel className="query-state"><span className="state-spinner" /><p>Loading workspace preferences...</p></Panel>
+  if (query.error || !settings) return <Panel className="query-state query-error"><CircleAlert size={20} /><strong>Workspace preferences unavailable</strong><p>{query.error?.message || "The backend did not return settings."}</p><Button variant="outline" className="small-button" onClick={() => void query.refetch()}>Retry</Button></Panel>
+  return <div className="settings-sections"><SettingSection title="Workspace identity"><div className="setting-row"><span><strong>Workspace name</strong><small>Shown in the operator shell</small></span><Input value={settings.name} placeholder="Workspace name" onChange={(event) => update.mutate({ name: event.target.value })} /></div><div className="setting-row"><span><strong>Timezone</strong><small>Used for schedule previews and activity timestamps</small></span><Input value={settings.timezone} onChange={(event) => update.mutate({ timezone: event.target.value })} /></div></SettingSection><SettingSection title="Workspace defaults"><div className="setting-row"><span><strong>Currency</strong><small>Default workspace reporting currency</small></span><Input className="scope-number" maxLength={3} value={settings.default_currency} onChange={(event) => update.mutate({ default_currency: event.target.value.toUpperCase() })} /></div><div className="setting-row"><span><strong>Default segment</strong><small>Used when a workflow does not specify one</small></span><select value={settings.default_segment} onChange={(event) => update.mutate({ default_segment: event.target.value })}><option value="">No default</option>{segments.map((segment) => <option key={segment} value={segment}>{segment}</option>)}</select></div></SettingSection><div className="settings-empty"><CheckCircle2 size={17} /><span>Workspace preferences are persisted by the backend and audited on change.</span></div></div>
 }
 
 function InfoIcon({ page }: { page: SettingsPage }) { const Icon = pages.find((item) => item.id === page)?.icon || Settings2; return <Icon size={20} /> }

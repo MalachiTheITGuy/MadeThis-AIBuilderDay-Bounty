@@ -270,6 +270,25 @@ export interface AutopilotScope {
   max_cost_units_per_action: number
 }
 
+export interface ApplicationSettings {
+  theme: 'system' | 'light' | 'dark'
+  density: 'comfortable' | 'compact'
+  date_format: 'locale' | 'iso'
+  time_format: '12h' | '24h'
+  currency: string
+  refresh_interval_seconds: number
+  default_landing_page: 'today' | 'opportunities' | 'approvals' | 'activity'
+  default_opportunity_sort: 'score' | 'recency' | 'value'
+  feature_flags: Record<string, boolean>
+}
+
+export interface WorkspaceSettings {
+  name: string
+  timezone: string
+  default_currency: string
+  default_segment: string
+}
+
 // API Client
 const API_BASE = '/api/v1'
 
@@ -307,6 +326,11 @@ export const api = {
   getLearningChanges: () => fetchApi<LearningChanges>('/learning/changes'),
   getPolicyHistory: () => fetchApi<PolicyVersion[]>('/policy/history'),
   getScope: () => fetchApi<{ scope: AutopilotScope }>('/control/scope'),
+  getApplicationSettings: () => fetchApi<{ settings: ApplicationSettings }>('/settings/application'),
+  updateApplicationSettings: (settings: Partial<ApplicationSettings>) => fetchApi<{ settings: ApplicationSettings }>('/settings/application', { method: 'PATCH', body: JSON.stringify(settings) }),
+  resetApplicationSettings: () => fetchApi<{ settings: ApplicationSettings; reset: boolean }>('/settings/application/reset', { method: 'POST' }),
+  getWorkspaceSettings: () => fetchApi<{ settings: WorkspaceSettings }>('/settings/workspace'),
+  updateWorkspaceSettings: (settings: Partial<WorkspaceSettings>) => fetchApi<{ settings: WorkspaceSettings }>('/settings/workspace', { method: 'PATCH', body: JSON.stringify(settings) }),
   getAuditExplain: (id: string) => fetchApi<Record<string, unknown>>(`/audit/explain/${id}`),
   pause: () => fetchApi<void>('/control/pause', { method: 'POST' }),
   stop: () => fetchApi<void>('/control/stop', { method: 'POST' }),
